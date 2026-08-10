@@ -13,7 +13,7 @@ import { createStageLogger } from "@tutorbot/shared/observability";
 import type { BotFleetEnv } from "../../types";
 import { discoverBotMessages, recordSentMessage } from "../../platform/hyperdrive/message-repo";
 import { getPersonaByName } from "../../platform/hyperdrive/persona-repo";
-import { cannedReply } from "../../domain/reply/canned";
+import { generateReply } from "../../domain/reply/llm";
 import { deliverReplyToGateway } from "../../platform/gateway/gateway-client";
 import { INITIAL_RUN_STATE, type RunState } from "./state";
 
@@ -37,7 +37,8 @@ function pollIntervalMs(env: BotFleetEnv): number {
  *
  * REDUCED (teaching) reply loop — each wake:
  *   1. DISCOVER new inbound messages via Hyperdrive (high-watermark cursor).
- *   2. REPLY to each with a deterministic, per-persona CANNED line (no model).
+ *   2. REPLY to each with a single Workers AI call routed through an AI Gateway
+ *      (domain/reply/llm.ts); falls back to a per-persona canned line if AI is off.
  *   3. PERSIST each reply as an outbound `message` row + DELIVER it to the gateway
  *      (best-effort; the row is the durable record).
  *   4. RESCHEDULE the next wake and hibernate.
@@ -126,8 +127,9 @@ export class BotFleetDO extends Agent<BotFleetEnv, RunState> implements BotFleet
   }
 
   /**
-   * Scheduled callback: one Hyperdrive->Postgres cursor poll, a canned reply per
-   * new inbound message, then reschedule the next poll and hibernate. Best-effort:
+   * Scheduled callback: one Hyperdrive->Postgres cursor poll, an AI-generated
+   * reply (gateway-routed, canned fallback) per new inbound message, then
+   * reschedule the next poll and hibernate. Best-effort:
    * a DB or delivery error is logged, and the loop keeps its cadence.
    */
   async pollOnce(): Promise<void> {
@@ -158,13 +160,13 @@ export class BotFleetDO extends Agent<BotFleetEnv, RunState> implements BotFleet
       });
     }
 
-    // (2+3) REPLY + PERSIST + DELIVER, one canned line per new inbound.
+    // (2+3) REPLY + PERSIST + DELIVER, one AI-generated line per new inbound.
     let repliesTotal = s.repliesTotal;
     let lastReplyId = s.lastReplyId;
     let persistFailed = false;
     for (const m of poll.messages) {
       const replyKey = buildReplyKey(m.idempotencyKey);
-      const content = cannedReply(s.persona, m.content);
+      const content = await generateReply(this.env, s.persona, m.content);
       const sent = await recordSentMessage(conn, botId, m.chatId, replyKey, content);
       if (sent.dbErr) {
         persistFailed = true;

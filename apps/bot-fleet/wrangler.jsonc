@@ -13,8 +13,18 @@
     // Gateway Worker base URL for reply delivery (FALLBACK only — the preferred
     // path is the GATEWAY service binding below). Empty => delivery is skipped
     // (the loop still runs and the reply row is still written to Postgres).
-    "GATEWAY_BASE_URL": ""
+    "GATEWAY_BASE_URL": "",
+    // AI Gateway NAME the reply call routes through (env.AI.run(..., {gateway:{id}})).
+    // This is a NAME, used directly (no id substitution) — the same name the IaC
+    // provisions as the ONE shared resource (envs/shared). Unset/empty => the reply
+    // falls back to the deterministic canned line. One name across all envs.
+    "AI_GATEWAY_ID": "tutorbot-bot-fleet"
   },
+
+  // Workers AI binding — the single model call that generates each reply
+  // (src/domain/reply/llm.ts). Account-scoped, so it is declared identically in
+  // every named env below (bindings are NOT inherited).
+  "ai": { "binding": "AI" },
 
   "observability": {
     "enabled": true,
@@ -61,8 +71,10 @@
       "placement": { "region": "aws:ap-southeast-2" },
       "vars": {
         "POLL_INTERVAL_SEC": "30",
-        "GATEWAY_BASE_URL": ""
+        "GATEWAY_BASE_URL": "",
+        "AI_GATEWAY_ID": "tutorbot-bot-fleet"
       },
+      "ai": { "binding": "AI" },
       "durable_objects": {
         "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
       },
@@ -73,8 +85,10 @@
       "placement": { "region": "aws:us-east-1" },
       "vars": {
         "POLL_INTERVAL_SEC": "30",
-        "GATEWAY_BASE_URL": ""
+        "GATEWAY_BASE_URL": "",
+        "AI_GATEWAY_ID": "tutorbot-bot-fleet"
       },
+      "ai": { "binding": "AI" },
       "durable_objects": {
         "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
       },
@@ -85,8 +99,10 @@
       "placement": { "region": "aws:eu-west-2" },
       "vars": {
         "POLL_INTERVAL_SEC": "30",
-        "GATEWAY_BASE_URL": ""
+        "GATEWAY_BASE_URL": "",
+        "AI_GATEWAY_ID": "tutorbot-bot-fleet"
       },
+      "ai": { "binding": "AI" },
       "durable_objects": {
         "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
       },
@@ -97,8 +113,10 @@
       "placement": { "region": "aws:ap-southeast-2" },
       "vars": {
         "POLL_INTERVAL_SEC": "30",
-        "GATEWAY_BASE_URL": ""
+        "GATEWAY_BASE_URL": "",
+        "AI_GATEWAY_ID": "tutorbot-bot-fleet"
       },
+      "ai": { "binding": "AI" },
       "durable_objects": {
         "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
       },

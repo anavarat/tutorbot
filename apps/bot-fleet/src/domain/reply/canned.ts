@@ -1,15 +1,15 @@
 import type { PersonaPrompt } from "./persona";
 
 /**
- * REPLY (reduced / teaching). A deterministic, per-persona canned reply — the
- * dumbed-down stand-in for a generated reply. No model call, no history, no
- * outbox: given the latest inbound line and the bot's persona, return a fixed
- * template. Pure and side-effect-free, so it is trivially testable and free.
+ * REPLY FALLBACK (reduced / teaching). A deterministic, per-persona canned reply.
+ * This is the fallback for the Workers AI reply (domain/reply/llm.ts): when AI is
+ * unconfigured (no AI_GATEWAY_ID) or the model call fails, `generateReply` returns
+ * this instead so the loop never drops a reply. No model call, no history: given
+ * the latest inbound line and the bot's persona, return a fixed template. Pure and
+ * side-effect-free, so it is trivially testable and free.
  *
  * With a persona the bot answers in-character as a subject tutor; with none it
- * falls back to a generic tutor voice. Kept intentionally simple: this is where a
- * real implementation would plug in an LLM, but for the teaching build a template
- * is enough to demonstrate the end-to-end path (poll -> reply -> deliver).
+ * falls back to a generic tutor voice.
  */
 export function cannedReply(persona: PersonaPrompt | null, inbound: string): string {
   const trimmed = inbound.trim().slice(0, 280);

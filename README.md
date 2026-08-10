@@ -8,12 +8,13 @@ reply, and hands it to a **Platform Gateway** for delivery over a real **Telegra
 running.
 
 > **What this teaches (and what it deliberately leaves out).** The architecture is real:
-> a control plane, a fleet of hibernating per-bot actors, and a socket-holding gateway,
-> all wired with Durable Objects, Hyperdrive, service bindings, and a container. The
-> *intelligence* is stubbed out on purpose — replies are deterministic, per-persona
-> **canned lines** (no model call), and the human-like cadence, durable reply pipeline,
-> and retry/dead-letter machinery have been removed. Read it to learn the **shape** of a
-> stateful edge system, not to run a production bot.
+ > a control plane, a fleet of hibernating per-bot actors, and a socket-holding gateway,
+ > all wired with Durable Objects, Hyperdrive, service bindings, and a container. The reply
+ > is a **single Workers AI call routed through an AI Gateway** (with a deterministic
+ > per-persona canned fallback), but everything else that makes replies *smart* — the
+ > human-like cadence, durable reply pipeline, and retry/dead-letter machinery — has been
+ > removed. Read it to learn the **shape** of a stateful edge system, not to run a
+ > production bot.
 
 Each app also has its own README with the deep detail:
 
@@ -43,7 +44,7 @@ the `FLEET_MANAGER` binding.
 ```
 Operator --HTTPS--> Access --> fleet-manager (D1: bots, gateways)
                             +-> platform-gateway --> GatewayContainer --> Telegram + Postgres
-BotFleetDO --Hyperdrive--> Postgres   --canned reply-->   --GATEWAY binding--> /outbound
+BotFleetDO --Hyperdrive--> Postgres   --AI Gateway reply-->   --GATEWAY binding--> /outbound
 ```
 
 ## Monorepo layout
@@ -68,8 +69,11 @@ interval (`POLL_INTERVAL_SEC`, default 30s):
 
 1. **Discover** — high-watermark scan of the bot's inbound (`message` rows with
    `from_me = false AND id > cursor`) over Hyperdrive.
-2. **Reply** — for each new inbound message, produce a deterministic, per-persona
-   **canned line** (`domain/reply/canned.ts`) — no model, no history, no prompt.
+2. **Reply** — for each new inbound message, generate a reply with a single Workers AI
+   call routed through an **AI Gateway** (`domain/reply/llm.ts`, addressed by the
+   `AI_GATEWAY_ID` name). If AI is unconfigured or the call fails it falls back to a
+   deterministic per-persona **canned line** (`domain/reply/canned.ts`) — so the loop
+   still works with AI turned off. No history, no multi-turn context.
 3. **Persist + deliver** — insert the reply as an outbound `message` row (`from_me = true`,
    dedup-safe on the reply key), then best-effort deliver it to the gateway. The row is the
    durable record; a delivery failure is logged and the loop keeps its cadence.
@@ -175,7 +179,7 @@ curl -sX POST https://<fleet-manager-host>/bots \
 Bindings and vars live in each app's `wrangler.jsonc`:
 
 - **bot-fleet** — `BOT_FLEET_DO` (Durable Object), `HYPERDRIVE` (Supabase pooler),
-  `GATEWAY` service binding, and `POLL_INTERVAL_SEC`.
+  `GATEWAY` service binding, `AI` (Workers AI) + `AI_GATEWAY_ID`, and `POLL_INTERVAL_SEC`.
 - **fleet-manager** — `DB` (D1 `fleet-registry`), `HYPERDRIVE` (persona picker),
   `GATEWAY` + `BOT_FLEET` service bindings, the reconciliation cron.
 - **platform-gateway** — `GATEWAY_CONTAINER` (Container), `FLEET_MANAGER` service binding,

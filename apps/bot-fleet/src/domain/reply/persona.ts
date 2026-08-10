@@ -4,10 +4,10 @@
  * columns are mapped to this camelCase shape by the platform adapter
  * (`platform/hyperdrive/persona-repo.ts`).
  *
- * This is a REDUCED, teaching-only persona: just enough voice for the canned
- * reply (see domain/reply/canned.ts). There is no scheduling / active-hours slice
- * and no generated-reply machinery — the bot answers with a deterministic,
- * per-persona template, not a model.
+ * This is a REDUCED, teaching-only persona: just enough voice to drive the reply.
+ * It shapes the system prompt for the Workers AI reply (domain/reply/llm.ts) and
+ * the deterministic fallback line (domain/reply/canned.ts). There is no scheduling
+ * / active-hours slice and no multi-turn memory.
  */
 export interface PersonaPrompt {
   /** Display name and catalog key, e.g. "Ada". */
