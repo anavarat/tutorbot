@@ -204,10 +204,10 @@ radius), *not* data sovereignty:
 
 | Env | Worker | `placement.region` |
 |---|---|---|
-| `staging` | `platform-gateway-staging` | `aws:ap-southeast-2` (AU) |
-| `us-production` | `platform-gateway-us-production` | `aws:us-east-1` |
-| `uk-production` | `platform-gateway-uk-production` | `aws:eu-west-2` |
-| `au-production` | `platform-gateway-au-production` | `aws:ap-southeast-2` |
+| `staging` | `tutorbot-platform-gateway-staging` | `aws:ap-southeast-2` (AU) |
+| `us-production` | `tutorbot-platform-gateway-us-production` | `aws:us-east-1` |
+| `uk-production` | `tutorbot-platform-gateway-uk-production` | `aws:eu-west-2` |
+| `au-production` | `tutorbot-platform-gateway-au-production` | `aws:ap-southeast-2` |
 
 `placement.region` pins **where the Worker runs**. The `GatewayContainer` (a DO-backed
 container) is created near the Worker's first touch, so it lands **in-region

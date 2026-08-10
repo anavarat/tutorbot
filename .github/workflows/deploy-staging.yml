@@ -195,7 +195,7 @@ jobs:
         with:
           api-path: d1/database
           id-field: uuid
-          resource-name: fleet-registry-staging
+          resource-name: tutorbot-fleet-registry-staging
           placeholder: STAGING_D1_ID
           working-directory: apps/fleet-manager
       - name: Pin staging Hyperdrive id (resolve-only)
@@ -208,7 +208,7 @@ jobs:
           working-directory: apps/fleet-manager
       - name: Apply D1 migrations (staging, remote)
         working-directory: apps/fleet-manager
-        run: pnpm exec wrangler d1 migrations apply fleet-registry-staging --env staging --remote
+        run: pnpm exec wrangler d1 migrations apply tutorbot-fleet-registry-staging --env staging --remote
       - name: Deploy fleet-manager (staging)
         working-directory: apps/fleet-manager
         run: pnpm exec wrangler deploy --env staging

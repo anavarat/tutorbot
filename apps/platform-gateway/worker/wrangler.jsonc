@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "platform-gateway",
+  "name": "tutorbot-platform-gateway",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-02",
   "workers_dev": true,
@@ -64,7 +64,7 @@
   // GET /bot-gateway uses env.FLEET_MANAGER to resolve botId -> gatewayId. Because
   // it's a service binding, the dispatch bypasses Access + CORS (no service token
   // needed). "service" must match FleetManager's deployed Worker name.
-  "services": [{ "binding": "FLEET_MANAGER", "service": "fleet-manager" }],
+  "services": [{ "binding": "FLEET_MANAGER", "service": "tutorbot-fleet-manager" }],
 
   "durable_objects": {
     "bindings": [{ "name": "GATEWAY_CONTAINER", "class_name": "GatewayContainer" }]
@@ -73,7 +73,7 @@
 
   "containers": [
     {
-      "name": "platform-gateway",
+      "name": "tutorbot-platform-gateway",
       "class_name": "GatewayContainer",
       "image": "../container/Dockerfile",
       "image_build_context": "../../..",
@@ -88,12 +88,12 @@
 
   // ---------------------------------------------------------------------------
   // Named environments (same Cloudflare account). The worker `name` auto-suffixes
-  // to platform-gateway-staging / platform-gateway-us-production. Only top-level
+  // to tutorbot-platform-gateway-staging / tutorbot-platform-gateway-us-production. Only top-level
   // `migrations` + `observability` + `compatibility_date` are INHERITED; every
   // binding (vars, services, durable_objects, containers, secrets_store_secrets) is
   // NOT inherited and is re-declared per env.
   //   - image_build_context is "../../.." (repo root is 3 levels up).
-  //   - FLEET_MANAGER binds the ENV-SUFFIXED fleet-manager-<env> worker.
+  //   - FLEET_MANAGER binds the ENV-SUFFIXED tutorbot-fleet-manager-<env> worker.
   //   - container `name` is env-suffixed so envs never collide on one container
   //     application name.
   //   - Keeps the Option-B DB wiring (DB_* vars + DB_PASSWORD from the Secrets
@@ -131,13 +131,13 @@
           "secret_name": "DB_STAGING_PASSWORD"
         }
       ],
-      "services": [{ "binding": "FLEET_MANAGER", "service": "fleet-manager-staging" }],
+      "services": [{ "binding": "FLEET_MANAGER", "service": "tutorbot-fleet-manager-staging" }],
       "durable_objects": {
         "bindings": [{ "name": "GATEWAY_CONTAINER", "class_name": "GatewayContainer" }]
       },
       "containers": [
         {
-          "name": "platform-gateway-staging",
+          "name": "tutorbot-platform-gateway-staging",
           "class_name": "GatewayContainer",
           "image": "../container/Dockerfile",
           "image_build_context": "../../..",
@@ -165,13 +165,13 @@
           "secret_name": "DB_US_PRODUCTION_PASSWORD"
         }
       ],
-      "services": [{ "binding": "FLEET_MANAGER", "service": "fleet-manager-us-production" }],
+      "services": [{ "binding": "FLEET_MANAGER", "service": "tutorbot-fleet-manager-us-production" }],
       "durable_objects": {
         "bindings": [{ "name": "GATEWAY_CONTAINER", "class_name": "GatewayContainer" }]
       },
       "containers": [
         {
-          "name": "platform-gateway-us-production",
+          "name": "tutorbot-platform-gateway-us-production",
           "class_name": "GatewayContainer",
           "image": "../container/Dockerfile",
           "image_build_context": "../../..",
@@ -199,13 +199,13 @@
           "secret_name": "DB_UK_PRODUCTION_PASSWORD"
         }
       ],
-      "services": [{ "binding": "FLEET_MANAGER", "service": "fleet-manager-uk-production" }],
+      "services": [{ "binding": "FLEET_MANAGER", "service": "tutorbot-fleet-manager-uk-production" }],
       "durable_objects": {
         "bindings": [{ "name": "GATEWAY_CONTAINER", "class_name": "GatewayContainer" }]
       },
       "containers": [
         {
-          "name": "platform-gateway-uk-production",
+          "name": "tutorbot-platform-gateway-uk-production",
           "class_name": "GatewayContainer",
           "image": "../container/Dockerfile",
           "image_build_context": "../../..",
@@ -233,13 +233,13 @@
           "secret_name": "DB_AU_PRODUCTION_PASSWORD"
         }
       ],
-      "services": [{ "binding": "FLEET_MANAGER", "service": "fleet-manager-au-production" }],
+      "services": [{ "binding": "FLEET_MANAGER", "service": "tutorbot-fleet-manager-au-production" }],
       "durable_objects": {
         "bindings": [{ "name": "GATEWAY_CONTAINER", "class_name": "GatewayContainer" }]
       },
       "containers": [
         {
-          "name": "platform-gateway-au-production",
+          "name": "tutorbot-platform-gateway-au-production",
           "class_name": "GatewayContainer",
           "image": "../container/Dockerfile",
           "image_build_context": "../../..",

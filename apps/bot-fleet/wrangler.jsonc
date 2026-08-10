@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "bot-fleet",
+  "name": "tutorbot-bot-fleet",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-05",
   // node-postgres (pg) needs the Node compat layer.
@@ -49,10 +49,10 @@
   // Cloudflare Access + the public edge (a same-account *.workers.dev fetch is
   // otherwise rejected at the edge, error 1042). GATEWAY_BASE_URL is a fallback.
   // Bindings are NOT inherited into named envs, so this is re-declared per env.
-  "services": [{ "binding": "GATEWAY", "service": "platform-gateway" }],
+  "services": [{ "binding": "GATEWAY", "service": "tutorbot-platform-gateway" }],
 
   // Named environments (same Cloudflare account). The worker `name` auto-suffixes
-  // to bot-fleet-<envKey> (e.g. bot-fleet-staging, bot-fleet-us-production).
+  // to tutorbot-bot-fleet-<envKey> (e.g. tutorbot-bot-fleet-staging, tutorbot-bot-fleet-us-production).
   // Wrangler does NOT inherit bindings into named envs, so vars/durable_objects/
   // hyperdrive/services are re-declared; only top-level `migrations` IS inherited.
   //
@@ -79,7 +79,7 @@
         "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
       },
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "SUPABASE_HYPERDRIVE_ID_STAGING" }],
-      "services": [{ "binding": "GATEWAY", "service": "platform-gateway-staging" }]
+      "services": [{ "binding": "GATEWAY", "service": "tutorbot-platform-gateway-staging" }]
     },
     "us-production": {
       "placement": { "region": "aws:us-east-1" },
@@ -93,7 +93,7 @@
         "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
       },
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "PROD_us_HYPERDRIVE_ID" }],
-      "services": [{ "binding": "GATEWAY", "service": "platform-gateway-us-production" }]
+      "services": [{ "binding": "GATEWAY", "service": "tutorbot-platform-gateway-us-production" }]
     },
     "uk-production": {
       "placement": { "region": "aws:eu-west-2" },
@@ -107,7 +107,7 @@
         "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
       },
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "PROD_uk_HYPERDRIVE_ID" }],
-      "services": [{ "binding": "GATEWAY", "service": "platform-gateway-uk-production" }]
+      "services": [{ "binding": "GATEWAY", "service": "tutorbot-platform-gateway-uk-production" }]
     },
     "au-production": {
       "placement": { "region": "aws:ap-southeast-2" },
@@ -121,7 +121,7 @@
         "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
       },
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "PROD_au_HYPERDRIVE_ID" }],
-      "services": [{ "binding": "GATEWAY", "service": "platform-gateway-au-production" }]
+      "services": [{ "binding": "GATEWAY", "service": "tutorbot-platform-gateway-au-production" }]
     }
   }
 }

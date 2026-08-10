@@ -100,8 +100,8 @@ applied by the container as a `CREATE IF NOT EXISTS` boot guard:
 The `persona` table (voice catalog: `name` / `subject` / `tone` / `greeting`) is created and
 seeded by `apps/bot-fleet/scripts/seed-personas.mjs`, not by the boot-guard DDL.
 
-The fleet-manager keeps its own **D1** registry (`fleet-registry`) as the control-plane
-source of truth for which bots/gateways exist.
+The fleet-manager keeps its own **D1** registry (`tutorbot-fleet-registry`) as the
+control-plane source of truth for which bots/gateways exist.
 
 ## Delivery & idempotency
 
@@ -178,11 +178,20 @@ curl -sX POST https://<fleet-manager-host>/bots \
 
 Bindings and vars live in each app's `wrangler.jsonc`:
 
-- **bot-fleet** — `BOT_FLEET_DO` (Durable Object), `HYPERDRIVE` (Supabase pooler),
-  `GATEWAY` service binding, `AI` (Workers AI) + `AI_GATEWAY_ID`, and `POLL_INTERVAL_SEC`.
-- **fleet-manager** — `DB` (D1 `fleet-registry`), `HYPERDRIVE` (persona picker),
-  `GATEWAY` + `BOT_FLEET` service bindings, the reconciliation cron.
-- **platform-gateway** — `GATEWAY_CONTAINER` (Container), `FLEET_MANAGER` service binding,
+> **Naming:** the pnpm package + directory names stay short (`bot-fleet`,
+> `fleet-manager`, `platform-gateway` under `apps/`), but the **deployed** Worker
+> names + account resources are `tutorbot-`-prefixed (`tutorbot-bot-fleet`,
+> `tutorbot-fleet-manager`, `tutorbot-platform-gateway`, D1 `tutorbot-fleet-registry`)
+> so they never collide with another stack in the same Cloudflare account. The IaC
+> (`04reduced-iac`) provisions Access apps + D1 under those same prefixed names.
+
+- **bot-fleet** (deploys as `tutorbot-bot-fleet`) — `BOT_FLEET_DO` (Durable Object),
+  `HYPERDRIVE` (Supabase pooler), `GATEWAY` service binding, `AI` (Workers AI) +
+  `AI_GATEWAY_ID`, and `POLL_INTERVAL_SEC`.
+- **fleet-manager** (deploys as `tutorbot-fleet-manager`) — `DB` (D1
+  `tutorbot-fleet-registry`), `HYPERDRIVE` (persona picker), `GATEWAY` + `BOT_FLEET`
+  service bindings, the reconciliation cron.
+- **platform-gateway** (deploys as `tutorbot-platform-gateway`) — `GATEWAY_CONTAINER` (Container), `FLEET_MANAGER` service binding,
   `DB_PASSWORD` from the account **Secrets Store** plus the non-secret `DB_*` parts
   (pointed at Supabase), and the app-level `TELEGRAM_API_ID` / `TELEGRAM_API_HASH`
   per-Worker secrets. The Worker assembles the DSN and forwards it to the container **in

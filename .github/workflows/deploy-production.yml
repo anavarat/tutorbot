@@ -182,7 +182,7 @@ jobs:
         with:
           api-path: d1/database
           id-field: uuid
-          resource-name: fleet-registry-${{ inputs.region }}-production
+          resource-name: tutorbot-fleet-registry-${{ inputs.region }}-production
           placeholder: PROD_${{ inputs.region }}_D1_ID
           working-directory: apps/fleet-manager
       - name: Pin ${{ inputs.region }} Hyperdrive id (resolve-only)
@@ -195,7 +195,7 @@ jobs:
           working-directory: apps/fleet-manager
       - name: Apply D1 migrations (${{ inputs.region }}-production, remote)
         working-directory: apps/fleet-manager
-        run: pnpm exec wrangler d1 migrations apply fleet-registry-${{ inputs.region }}-production --env ${{ inputs.region }}-production --remote
+        run: pnpm exec wrangler d1 migrations apply tutorbot-fleet-registry-${{ inputs.region }}-production --env ${{ inputs.region }}-production --remote
       - name: Deploy fleet-manager (${{ inputs.region }}-production)
         working-directory: apps/fleet-manager
         run: pnpm exec wrangler deploy --env ${{ inputs.region }}-production
