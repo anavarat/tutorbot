@@ -1,0 +1,29 @@
+.github/workflows/deploy-production.yml
+  s_6e01a1d2ed993d::t_b5a16f338fb40d 185,198
+.github/workflows/deploy-staging.yml
+  s_6e01a1d2ed993d::t_fe3c741826affb 198,211
+apps/bot-fleet/wrangler.jsonc
+  s_6e01a1d2ed993d::t_3ee72ebd755740 3,52,55,82,96,110,124
+apps/fleet-manager/wrangler.jsonc
+  s_6e01a1d2ed993d::t_f72ce8290e6e5f 3,10-11,19,28-29,33-34,54-56,59,63,70,72,80-82,89,95-96,102,111,117-118,124,133,139-140,146,155,161-162,168
+apps/platform-gateway/README.md
+  s_6e01a1d2ed993d::t_f296fca2c05822 207-210
+apps/platform-gateway/worker/wrangler.jsonc
+  s_6e01a1d2ed993d::t_5fd4de154f2f08 3,67,76,91,96,134,140,168,174,202,208,236,242
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f449c3cbd332e4e0f952185cdcacc169b671b31d",
+  "prompts": {},
+  "sessions": {
+    "s_6e01a1d2ed993d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0d4f459a6ffe3hKwxir4wrE3Ve",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Kuber Gaur <kgaur@cloudflare.com>"
+    }
+  }
+}
