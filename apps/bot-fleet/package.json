@@ -1,0 +1,30 @@
+{
+  "name": "bot-fleet",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail --format pretty",
+    "types": "wrangler types",
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm --dir ../../packages/shared build && vitest run",
+    "reset": "node scripts/reset.mjs",
+    "metrics": "node scripts/metrics.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260704.1",
+    "@types/node": "^26.1.0",
+    "@types/pg": "^8.20.0",
+    "typescript": "^6.0.3",
+    "vitest": "2.1.8",
+    "wrangler": "^4.107.0"
+  },
+  "dependencies": {
+    "@tutorbot/shared": "workspace:*",
+    "agents": "^0.17.3",
+    "hono": "^4.12.28",
+    "pg": "^8.22.0"
+  }
+}

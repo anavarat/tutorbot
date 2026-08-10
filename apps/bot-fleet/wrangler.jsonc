@@ -1,0 +1,109 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bot-fleet",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-05",
+  // node-postgres (pg) needs the Node compat layer.
+  "compatibility_flags": ["nodejs_compat"],
+
+  "vars": {
+    // Seconds between poll wakes for each bot's self-scheduled loop. Fixed cadence
+    // (the teaching build has no jitter). Default in code is 30 if unset.
+    "POLL_INTERVAL_SEC": "30",
+    // Gateway Worker base URL for reply delivery (FALLBACK only — the preferred
+    // path is the GATEWAY service binding below). Empty => delivery is skipped
+    // (the loop still runs and the reply row is still written to Postgres).
+    "GATEWAY_BASE_URL": ""
+  },
+
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    // Native zero-config distributed tracing. NOTE: the BotFleetDO poll loop is
+    // schedule-driven (no incoming fetch), so native coverage of the loop itself
+    // is limited. Inherited into named envs.
+    "traces": { "enabled": true, "head_sampling_rate": 1 }
+  },
+
+  "durable_objects": {
+    "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BotFleetDO"] }],
+
+  // Hyperdrive -> Supabase (session pooler, caching OFF). Fill the id with the
+  // Hyperdrive config that points at your Supabase database.
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "SUPABASE_HYPERDRIVE_ID" }],
+
+  // PREFERRED delivery transport: internal service binding to the gateway Worker.
+  // A Worker->Worker binding call reaches the gateway directly, bypassing
+  // Cloudflare Access + the public edge (a same-account *.workers.dev fetch is
+  // otherwise rejected at the edge, error 1042). GATEWAY_BASE_URL is a fallback.
+  // Bindings are NOT inherited into named envs, so this is re-declared per env.
+  "services": [{ "binding": "GATEWAY", "service": "platform-gateway" }],
+
+  // Named environments (same Cloudflare account). The worker `name` auto-suffixes
+  // to bot-fleet-<envKey> (e.g. bot-fleet-staging, bot-fleet-us-production).
+  // Wrangler does NOT inherit bindings into named envs, so vars/durable_objects/
+  // hyperdrive/services are re-declared; only top-level `migrations` IS inherited.
+  //
+  // REGIONAL DEPLOYMENTS (operational isolation, NOT data sovereignty). Each region
+  // is a SEPARATE worker script => a SEPARATE DO namespace => isolated per region.
+  //   - `placement.region` pins WHERE the Worker runs; the BotFleetDO is created
+  //     near the first request it receives, so it lands in-region transitively.
+  //   - staging is a SINGLE env pinned to Australia (ap-southeast-2).
+  //   - production fans out to us / uk / au. Each targets its OWN region-suffixed
+  //     sibling workers (GATEWAY service) + its OWN Hyperdrive (resolve-only token
+  //     PROD_<region>_HYPERDRIVE_ID, pinned by CI from the per-region Supabase
+  //     Hyperdrive config). Keep each region's Hyperdrive near its Worker.
+  //   Region map:  us -> aws:us-east-1 | uk -> aws:eu-west-2 | au -> aws:ap-southeast-2
+  "env": {
+    "staging": {
+      "placement": { "region": "aws:ap-southeast-2" },
+      "vars": {
+        "POLL_INTERVAL_SEC": "30",
+        "GATEWAY_BASE_URL": ""
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
+      },
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "SUPABASE_HYPERDRIVE_ID_STAGING" }],
+      "services": [{ "binding": "GATEWAY", "service": "platform-gateway-staging" }]
+    },
+    "us-production": {
+      "placement": { "region": "aws:us-east-1" },
+      "vars": {
+        "POLL_INTERVAL_SEC": "30",
+        "GATEWAY_BASE_URL": ""
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
+      },
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "PROD_us_HYPERDRIVE_ID" }],
+      "services": [{ "binding": "GATEWAY", "service": "platform-gateway-us-production" }]
+    },
+    "uk-production": {
+      "placement": { "region": "aws:eu-west-2" },
+      "vars": {
+        "POLL_INTERVAL_SEC": "30",
+        "GATEWAY_BASE_URL": ""
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
+      },
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "PROD_uk_HYPERDRIVE_ID" }],
+      "services": [{ "binding": "GATEWAY", "service": "platform-gateway-uk-production" }]
+    },
+    "au-production": {
+      "placement": { "region": "aws:ap-southeast-2" },
+      "vars": {
+        "POLL_INTERVAL_SEC": "30",
+        "GATEWAY_BASE_URL": ""
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
+      },
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "PROD_au_HYPERDRIVE_ID" }],
+      "services": [{ "binding": "GATEWAY", "service": "platform-gateway-au-production" }]
+    }
+  }
+}

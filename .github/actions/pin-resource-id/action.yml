@@ -1,0 +1,67 @@
+name: Pin provisioned resource id
+description: >
+  Resolve a Cloudflare resource id BY NAME and substitute its placeholder token in
+  a wrangler config for this run only (ephemeral, not committed). RESOLVE-ONLY:
+  fails loudly if the resource does not exist — CI does not create infrastructure
+  (provision it first, by dashboard / wrangler / Terraform).
+
+inputs:
+  api-path:
+    description: "CF API path under /accounts/{id}/ (e.g. hyperdrive/configs, secrets_store/stores, d1/database)"
+    required: true
+  id-field:
+    description: "JSON field on each result holding the id (id | uuid)"
+    required: false
+    default: id
+  resource-name:
+    description: "The resource .name to match"
+    required: true
+  placeholder:
+    description: "Placeholder token string present in the config file"
+    required: true
+  working-directory:
+    description: "Directory containing the wrangler config"
+    required: true
+  config-file:
+    description: "Config filename"
+    required: false
+    default: wrangler.jsonc
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        PIN_API_PATH: ${{ inputs.api-path }}
+        PIN_ID_FIELD: ${{ inputs.id-field }}
+        PIN_RESOURCE_NAME: ${{ inputs.resource-name }}
+        PIN_PLACEHOLDER: ${{ inputs.placeholder }}
+        PIN_CONFIG: ${{ inputs.config-file }}
+      run: |
+        set -euo pipefail
+        : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN not set}"
+        : "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID not set}"
+
+        ID=$(curl -sf \
+          -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+          "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/${PIN_API_PATH}" \
+          | jq -r --arg n "$PIN_RESOURCE_NAME" --arg f "$PIN_ID_FIELD" \
+              '.result[] | select(.name==$n) | .[$f]' | head -n1)
+
+        if [ -z "${ID:-}" ] || [ "$ID" = "null" ]; then
+          echo "::error::'${PIN_RESOURCE_NAME}' (${PIN_API_PATH}) not found. CI is resolve-only — provision it first."
+          exit 1
+        fi
+
+        PIN_ID="$ID" node -e '
+          const fs = require("fs");
+          const p = process.env.PIN_CONFIG;
+          const id = process.env.PIN_ID;
+          const tok = process.env.PIN_PLACEHOLDER;
+          const before = fs.readFileSync(p, "utf8");
+          const after = before.split(tok).join(id);
+          if (after === before) { console.error(tok + " token not found in " + p); process.exit(1); }
+          fs.writeFileSync(p, after);
+          console.log("pinned " + tok + " -> " + id);
+        '

@@ -1,0 +1,12 @@
+-- Add the bot -> persona assignment to the fleet registry.
+--
+-- Until now persona was a fire-and-forget arg on POST /bots: FM forwarded
+-- personaName to the DO but never stored it, so on any FM-driven re-provision
+-- (or a future "restart all") the assignment was lost and the bot silently fell
+-- back to the default prompt. Persona now becomes FM-owned, symmetric with
+-- gateway_id: persisted here, reused on re-provision, and surfaced in GET /bots.
+--
+-- NULLABLE (no NOT NULL, no default): persona is OPTIONAL — a bot may run on the
+-- fallback prompt. Non-destructive ADD COLUMN (existing rows get NULL); no table
+-- rebuild needed (unlike 0002's gateway_id reconcile).
+ALTER TABLE bots ADD COLUMN persona_name TEXT;

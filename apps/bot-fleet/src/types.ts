@@ -1,0 +1,39 @@
+import type { BotFleetDO } from "./durable-objects/bot-fleet-do/bot-fleet-do";
+
+/**
+ * bot-fleet (data-plane) bindings. This Worker HOSTS the BotFleetDO class (an
+ * Agents SDK long-running Agent); each bot polls its own bot_id in Supabase via
+ * the shared Hyperdrive binding on a fixed-interval self-scheduled poll loop
+ * (this.schedule()). Provisioning is driven by the fleet-manager Worker.
+ *
+ * REDUCED build: no Workers AI (replies are canned), no jitter tunables.
+ */
+export interface BotFleetEnv {
+  /** DO namespace for the per-bot pollers (this Worker owns + migrates the class). */
+  BOT_FLEET_DO: DurableObjectNamespace<BotFleetDO>;
+  /** Hyperdrive -> Supabase (session pooler, caching OFF). */
+  HYPERDRIVE: Hyperdrive;
+
+  /** Seconds between poll wakes. Default 30. A fixed cadence (no jitter in the teaching build). */
+  POLL_INTERVAL_SEC?: string;
+
+  /**
+   * PREFERRED delivery transport: internal service binding to the gateway Worker
+   * (script "platform-gateway"). A Worker->Worker binding call reaches the gateway
+   * directly, bypassing Cloudflare Access + the public edge; when present it is
+   * used INSTEAD of GATEWAY_BASE_URL/CF_ACCESS_* (which become an inert fallback).
+   */
+  GATEWAY?: Fetcher;
+  /**
+   * FALLBACK base URL of the gateway Worker. Used only when the GATEWAY binding is
+   * absent. Unset (and no binding) => delivery is skipped (the loop still runs and
+   * the reply row is still written).
+   */
+  GATEWAY_BASE_URL?: string;
+  /**
+   * Optional Cloudflare Access service-token creds (SECRETS, set via
+   * `wrangler secret put`). Only needed if the gateway hostname is Access-gated.
+   */
+  CF_ACCESS_CLIENT_ID?: string;
+  CF_ACCESS_CLIENT_SECRET?: string;
+}

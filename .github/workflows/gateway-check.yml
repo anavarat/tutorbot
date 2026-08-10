@@ -1,0 +1,85 @@
+name: Gateway Check
+
+# SEPARATE CI gate for the platform-gateway (worker + container + @tutorbot/shared).
+# Intentionally DISTINCT from the fleet's "Fleet Check" (bot-fleet + fleet-manager):
+# the gateway has its own build shape (a Docker container image + Wrangler config
+# validation) and its own deploy cadence, so it runs on its own. Path filters keep
+# this scoped to gateway inputs so bot-fleet/fleet-manager changes don't trigger a
+# gateway run (and vice-versa).
+#
+# PR-ONLY gate. Push to main is owned by the ordered pipeline (deploy-staging.yml,
+# which has its own pgw-check + pgw-deploy jobs).
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/gateway-check.yml"
+      - ".github/workflows/deploy-staging.yml"
+      - ".github/workflows/deploy-production.yml"
+      - ".github/actions/**"
+      - "apps/platform-gateway/**"
+      - "packages/shared/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
+      - "eslint.config.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gateway-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # pnpm 11.5.2 == the repo's packageManager. Lockfile is lockfileVersion 9.0
+      # (compatible across pnpm 9-11), so `--frozen-lockfile` matches exactly.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Scope every gate to the gateway packages only (this workflow is
+      # independent of the fleet's Fleet Check).
+      - name: Lint
+        run: pnpm exec eslint apps/platform-gateway packages/shared --max-warnings=0
+
+      # worker + container test scripts build @tutorbot/shared first, then run vitest.
+      - name: Test
+        run: pnpm --filter "@tutorbot/platform-gateway-worker" --filter "@tutorbot/platform-gateway-container" test
+
+      - name: Typecheck
+        run: pnpm --filter "@tutorbot/shared" --filter "@tutorbot/platform-gateway-worker" --filter "@tutorbot/platform-gateway-container" typecheck
+
+      - name: Build shared package
+        run: pnpm --filter "@tutorbot/shared" build
+
+      - name: Build container package
+        run: pnpm --filter "@tutorbot/platform-gateway-container" build
+
+      # `validate:config` runs `wrangler types` for the default + staging envs, so a
+      # staging-only config error can't slip past.
+      - name: Validate Wrangler config
+        run: pnpm --filter "@tutorbot/platform-gateway-worker" validate:config
+
+      # Build the container image the same way `wrangler deploy` will: context =
+      # repo root (matches image_build_context "../../.." in wrangler.jsonc), which
+      # is what the Dockerfile's COPY paths (apps/platform-gateway/container,
+      # packages/shared, root manifests) expect.
+      - name: Build container image
+        run: docker build -f apps/platform-gateway/container/Dockerfile .

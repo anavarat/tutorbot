@@ -1,0 +1,35 @@
+{
+  "name": "@tutorbot/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./rpc": {
+      "types": "./src/rpc.ts",
+      "import": "./dist/rpc.js",
+      "default": "./dist/rpc.js"
+    },
+    "./observability": {
+      "types": "./src/observability/index.ts",
+      "import": "./dist/observability/index.js",
+      "default": "./dist/observability/index.js"
+    }
+  },
+  "scripts": {
+    "build": "pnpm exec tsc -p tsconfig.json",
+    "typecheck": "pnpm exec tsc -p tsconfig.json",
+    "test": "pnpm exec vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260704.1",
+    "typescript": "^6.0.3",
+    "vitest": "2.1.8"
+  }
+}

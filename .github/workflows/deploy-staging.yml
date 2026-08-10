@@ -1,0 +1,293 @@
+name: Deploy Staging
+
+# ONE ordered staging pipeline for the whole monorepo. Runs the exact chain:
+#
+#   bf-check -> bf-deploy -> fm-check -> fm-deploy -> pgw-check -> pgw-deploy
+#
+# Jobs are chained with `needs`, so the order is strict and it FAILS FAST: if
+# bf-deploy fails, everything after it is skipped. That is deliberate — it kills
+# the cross-Worker service-binding cascade (pgw's FLEET_MANAGER binding can't
+# resolve until fleet-manager exists, and fleet-manager's cross-script BOT_FLEET
+# binding can't resolve until bot-fleet exists).
+#
+# Dependency order (a service binding requires its target Worker to already EXIST
+# at deploy time, not to redeploy):
+#   fleet-manager -> bot-fleet   (BOT_FLEET -> bot-fleet-staging)
+#   platform-gw   -> fleet-manager (FLEET_MANAGER -> fleet-manager-staging)
+#   bot-fleet     -> platform-gw  (GATEWAY -> platform-gateway-staging) [steady-state only]
+# So bf -> fm -> pgw works once the environment is bootstrapped (bf's GATEWAY
+# target already exists from a prior run). For a COLD environment see the note at
+# the bottom.
+#
+# SECRETS: only the *-deploy jobs need CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID,
+# read directly from the `staging` GitHub Environment. The *-check jobs need NO
+# secrets.
+#
+# BUILD-SHARED: every deploy job builds @tutorbot/shared FIRST. `wrangler deploy`
+# bundles @tutorbot/shared from its built dist/ (package exports resolve to
+# ./dist/*), and a bare `wrangler deploy --env staging` bypasses each app's
+# shared-building `deploy` npm script.
+#
+# RESOURCE IDS: the deploy jobs RESOLVE the Hyperdrive / D1 / Secrets Store ids by
+# NAME and pin them into the wrangler config for the run (resolve-only, ephemeral).
+# Provision those resources first (dashboard / wrangler / Terraform) under the
+# names referenced below, or the pin step fails loudly.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/deploy-staging.yml"
+      - "apps/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
+      - "eslint.config.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # 1) bot-fleet CHECK ---------------------------------------------------------
+  bf-check:
+    name: bf check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm exec eslint apps/bot-fleet packages/shared --max-warnings=0
+      - name: Test
+        run: pnpm --filter bot-fleet test
+      - name: Typecheck
+        run: pnpm --filter "@tutorbot/shared" --filter bot-fleet typecheck
+      # Dry-run bundles + validates config for every env the deploys target.
+      - name: Validate wrangler config (default)
+        run: pnpm --filter bot-fleet exec wrangler deploy --dry-run
+      - name: Validate wrangler config (staging)
+        run: pnpm --filter bot-fleet exec wrangler deploy --dry-run --env staging
+      - name: Validate wrangler config (us/uk/au-production)
+        run: |
+          for r in us uk au; do
+            pnpm --filter bot-fleet exec wrangler deploy --dry-run --env "$r-production"
+          done
+
+  # 2) bot-fleet DEPLOY --------------------------------------------------------
+  bf-deploy:
+    name: bf staging deploy
+    needs: bf-check
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build shared package
+        run: pnpm --filter "@tutorbot/shared" build
+      # Registers the BotFleetDO namespace (SQLite migration v1) + uploads the
+      # worker as bot-fleet-staging. No fetch/cron on deploy => ZERO DO instances.
+      # Resolve the Hyperdrive (Supabase) id by name and pin it into the staging
+      # env block (ephemeral). Resolve-only: fails if the config does not exist.
+      - name: Pin staging Hyperdrive id (resolve-only)
+        uses: ./.github/actions/pin-resource-id
+        with:
+          api-path: hyperdrive/configs
+          id-field: id
+          resource-name: tutorbot-supabase-staging
+          placeholder: SUPABASE_HYPERDRIVE_ID_STAGING
+          working-directory: apps/bot-fleet
+      - name: Deploy bot-fleet (staging)
+        working-directory: apps/bot-fleet
+        run: pnpm exec wrangler deploy --env staging
+
+  # 3) fleet-manager CHECK -----------------------------------------------------
+  fm-check:
+    name: fm check
+    needs: bf-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm exec eslint apps/fleet-manager packages/shared --max-warnings=0
+      - name: Test
+        run: pnpm --filter fleet-manager test
+      - name: Typecheck
+        run: pnpm --filter "@tutorbot/shared" --filter fleet-manager typecheck
+      # The D1 / Hyperdrive placeholder tokens in the env blocks are tolerated by
+      # dry-run.
+      - name: Validate wrangler config (default)
+        run: pnpm --filter fleet-manager exec wrangler deploy --dry-run
+      - name: Validate wrangler config (staging)
+        run: pnpm --filter fleet-manager exec wrangler deploy --dry-run --env staging
+      - name: Validate wrangler config (us/uk/au-production)
+        run: |
+          for r in us uk au; do
+            pnpm --filter fleet-manager exec wrangler deploy --dry-run --env "$r-production"
+          done
+
+  # 4) fleet-manager DEPLOY ----------------------------------------------------
+  fm-deploy:
+    name: fm staging deploy
+    needs: fm-check
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build shared package
+        run: pnpm --filter "@tutorbot/shared" build
+      # Resolve-only: look up D1 + Hyperdrive by name and pin their ids into the
+      # staging env block (ephemeral, not committed). Fails loudly if missing.
+      - name: Pin staging D1 id (resolve-only)
+        uses: ./.github/actions/pin-resource-id
+        with:
+          api-path: d1/database
+          id-field: uuid
+          resource-name: fleet-registry-staging
+          placeholder: STAGING_D1_ID
+          working-directory: apps/fleet-manager
+      - name: Pin staging Hyperdrive id (resolve-only)
+        uses: ./.github/actions/pin-resource-id
+        with:
+          api-path: hyperdrive/configs
+          id-field: id
+          resource-name: tutorbot-supabase-staging
+          placeholder: SUPABASE_HYPERDRIVE_ID_STAGING
+          working-directory: apps/fleet-manager
+      - name: Apply D1 migrations (staging, remote)
+        working-directory: apps/fleet-manager
+        run: pnpm exec wrangler d1 migrations apply fleet-registry-staging --env staging --remote
+      - name: Deploy fleet-manager (staging)
+        working-directory: apps/fleet-manager
+        run: pnpm exec wrangler deploy --env staging
+
+  # 5) platform-gateway CHECK --------------------------------------------------
+  pgw-check:
+    name: pgw check
+    needs: fm-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm exec eslint apps/platform-gateway packages/shared --max-warnings=0
+      - name: Test
+        run: pnpm --filter "@tutorbot/platform-gateway-worker" --filter "@tutorbot/platform-gateway-container" test
+      - name: Typecheck
+        run: pnpm --filter "@tutorbot/shared" --filter "@tutorbot/platform-gateway-worker" --filter "@tutorbot/platform-gateway-container" typecheck
+      - name: Build shared package
+        run: pnpm --filter "@tutorbot/shared" build
+      - name: Build container package
+        run: pnpm --filter "@tutorbot/platform-gateway-container" build
+      # `validate:config` runs `wrangler types` for default + staging.
+      - name: Validate Wrangler config
+        run: pnpm --filter "@tutorbot/platform-gateway-worker" validate:config
+
+  # 6) platform-gateway DEPLOY -------------------------------------------------
+  pgw-deploy:
+    name: pgw staging deploy
+    needs: pgw-check
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build shared package
+        run: pnpm --filter "@tutorbot/shared" build
+      # Deploys worker platform-gateway-staging + builds/pushes the container image
+      # and rolls it out gradually. Its FLEET_MANAGER service binding now resolves
+      # because fm-deploy (job 4) ran first. Resolve the Secrets Store id by name
+      # and pin it into the staging env block (ephemeral). Resolve-only.
+      - name: Pin staging Secrets Store id (resolve-only)
+        uses: ./.github/actions/pin-resource-id
+        with:
+          api-path: secrets_store/stores
+          id-field: id
+          resource-name: tutorbot-bots-staging
+          placeholder: STAGING_SECRETS_STORE_ID
+          working-directory: apps/platform-gateway/worker
+      - name: Deploy gateway (staging)
+        run: pnpm --filter "@tutorbot/platform-gateway-worker" exec wrangler deploy --env staging --containers-rollout=gradual
+
+# COLD ENVIRONMENT NOTE ------------------------------------------------------
+# On a brand-new account the service-binding graph has a cycle (bf -> pgw -> fm
+# -> bf), so no strict order can satisfy every binding on the FIRST deploy. This
+# chain assumes a bootstrapped env (targets already exist). For a cold bootstrap,
+# run once with the cross-service bindings temporarily removed (or deploy stubs),
+# then re-run this pipeline.

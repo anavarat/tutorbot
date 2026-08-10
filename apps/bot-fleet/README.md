@@ -1,0 +1,155 @@
+# Bot Fleet
+
+The **data plane** for the fleet. This is where each bot's loop runs: it wakes on a fixed
+interval, reads the new messages that arrived for its account, produces a reply, and hands
+that reply off to be delivered.
+
+Bot Fleet holds **no operator API and no registry** — Fleet Manager (the control plane)
+owns "which bots exist" and drives this service over an internal service binding. Bot
+Fleet's job is narrower and deeper: run the per-bot loop, cheaply, and stay asleep the
+rest of the time.
+
+Each bot is a **Durable Object** — one live, stateful actor per bot (`BotFleetDO`,
+addressed by name, e.g. `bot-1`). It is built on the Agents SDK long-running-agent
+pattern, so a bot keeps typed state in SQLite and drives itself with self-scheduled
+alarms instead of an always-on process. Between wakes the bot **hibernates at ~0
+compute**, which is the whole point of this design.
+
+> **Teaching build.** The reply here is a deterministic, per-persona **canned line** —
+> there is no model call. Everything that makes replies *smart* (prompt building,
+> transcript memory, jittered human-like cadence, a durable outbox with retries and
+> dead-lettering, ban-risk guards) has been removed so the loop is easy to read. What
+> remains is the *shape* of a hibernating per-bot actor.
+
+---
+
+## The pieces it runs
+
+| Piece | What it is | Notes |
+|---|---|---|
+| **BotFleetDO** | One Durable Object per bot — the stateful actor that owns the loop. | Named `bot-<n>`; holds run-state (cursor, counters, persona) in DO SQLite. |
+| **Poll loop** | The alarm-driven wake cycle: discover -> reply -> persist -> deliver -> reschedule. | Self-scheduled via `this.schedule()`; hibernates between wakes. |
+| **Canned reply** | A fixed line derived from the bot's persona (`domain/reply/canned.ts`). | Pure function, no I/O, no model — same input gives the same reply. |
+| **Persona** | The bot's voice: `name` / `subject` / `tone` / `greeting`. | Hydrated ONCE per run from Postgres; a miss falls back to a generic tutor voice. |
+| **Hyperdrive -> Postgres** | The pooled Postgres connection to the shared Supabase database. | All reads/writes go through one unified `message` table. |
+
+Bot Fleet talks to the **gateway** over an internal service binding (`GATEWAY`) to
+deliver replies. It never opens a Telegram socket itself and never holds a credential —
+that lives entirely in the gateway.
+
+---
+
+## What it stores
+
+Two kinds of state, in two places:
+
+- **Per-bot run-state (DO SQLite).** Each `BotFleetDO` keeps a small typed state row:
+  the bot's id and current `gatewayId`, its hydrated persona, the **poll cursor** (a
+  high-watermark message id), counters (`count`, `rowsTotal`, `repliesTotal`), and the
+  next poll wake time. This is what survives hibernation and lets a wake pick up exactly
+  where the last one left off.
+
+- **Messages (Postgres, shared with the gateway).** Bot Fleet reads and writes the unified
+  **`message` table**. Inbound messages (`from_me = false`) are what it polls; its own
+  replies (`from_me = true`) are written back into the *same* table. That reply row is the
+  durable record of the turn; delivery to the channel is best-effort on top of it. The bot
+  never stores the credential or any channel-native socket state.
+
+---
+
+## HTTP API (internal only)
+
+Bot Fleet exposes **no operator-facing API**. Fleet Manager drives bot lifecycle over the
+`BOT_FLEET` service binding, which calls these control routes; each route resolves the
+per-bot DO by name and invokes its native RPC method.
+
+```
+POST /bots/:id/start          begin the poll loop        { gatewayId, personaName?, force? }
+POST /bots/:id/reconfigure    live gateway swap          { gatewayId }   (no restart, keeps cursor/counters)
+POST /bots/:id/stop           stop the loop
+GET  /bots/:id/stats          read counters (no side effect)
+
+GET  /ping-db                 worker-level DB connectivity check (never touches a DO)
+GET  /docs                    API reference (OpenAPI / Scalar UI)
+```
+
+A method's **business** outcome (e.g. `reconfigure` on a stopped bot -> `ok:false "not
+running"`) is a `200` — it's a valid result, not a transport error. Only a thrown error
+is a `500`, so the caller can treat non-2xx as an infra failure.
+
+---
+
+## Core features
+
+### 1. The poll loop (discover -> reply -> reschedule)
+
+Each wake runs one cycle and then reschedules itself on a **fixed** interval
+(`POLL_INTERVAL_SEC`, default 30s):
+
+1. **Discover** — a single high-watermark scan of this bot's inbound messages
+   (`from_me = false AND id > cursor`, ordered, capped at a page). The **whole batch**
+   that piled up during hibernation is read, not just the latest line.
+2. **Reply** — for each new inbound message, build a deterministic **canned line** from
+   the persona (`cannedReply(persona, inboundText)`), keyed by a `replyKey` derived from
+   the inbound message's idempotency key.
+3. **Persist + deliver** — insert the reply as an outbound `message` row (dedup-safe on the
+   `replyKey`), then best-effort deliver it to the gateway. The row is the source of truth;
+   a delivery failure is logged and the loop keeps its cadence.
+4. **Reschedule** — advance the cursor and counters, schedule the next wake, and hibernate.
+
+If a **persist fails**, the cursor is *held* so the same batch is re-discovered and retried
+next wake. Because the `replyKey` is deterministic, a retry that had partially landed is a
+dedup-safe no-op — the bot never double-replies.
+
+### 2. Live gateway reassignment (no restart)
+
+When Fleet Manager moves a running bot to a new gateway, it calls `reconfigure` — which
+mutates only the `gatewayId` in run-state. The already-scheduled poll reads the gateway
+**fresh on every wake**, so the next wake simply delivers to the new gateway. The cursor,
+counters and cadence are all left intact (unlike a forced restart, which resets the run).
+
+---
+
+## How it fits with the other services
+
+```
+   +---------------+   start / stop / reconfigure     +---------------+
+   | Fleet Manager | ----------(BOT_FLEET)-----------> |   Bot Fleet   |
+   | (control)     |                                   |  (this app)   |
+   +---------------+                                   +-------+-------+
+                                                               |
+                        +--------------------------------------+---------------+
+                        |                                                       |
+                        v read inbound / write reply                           v deliver reply
+                  +-------------+                                        +-------------+
+                  |  Postgres   | <----------- message table            |   gateway   |
+                  | (Hyperdrive)|                                        |  (socket)   |
+                  +-------------+                                        +-------------+
+```
+
+- **Fleet Manager -> Bot Fleet:** start / stop / reconfigure a bot's loop.
+- **Bot Fleet -> Postgres (Hyperdrive):** poll inbound messages; write replies.
+- **Bot Fleet -> gateway:** deliver a reply for the account's live socket to send. The
+  gateway owns the credential and the socket; Bot Fleet never sees either.
+
+---
+
+## Running it
+
+```bash
+# type-check
+pnpm --dir apps/bot-fleet typecheck
+
+# tests
+pnpm --dir apps/bot-fleet test
+
+# deploy (staging) — run from the repo root
+pnpm --dir apps/bot-fleet exec wrangler deploy --env staging
+
+# tail live logs (staging) — streams the worker's structured logs
+pnpm --dir apps/bot-fleet exec wrangler tail --env staging
+pnpm --dir apps/bot-fleet exec wrangler tail --env staging --status error
+```
+
+Configuration (the Hyperdrive/Postgres connection, the gateway service binding, and the
+`POLL_INTERVAL_SEC` cadence) lives in `wrangler.jsonc`.

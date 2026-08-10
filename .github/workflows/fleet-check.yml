@@ -1,0 +1,92 @@
+name: Fleet Check
+
+# PR gate for the FLEET (bot-fleet + fleet-manager + @tutorbot/shared): one
+# checkout, one install, then validate both workers. No deploy here.
+#
+# Domain-scoped by design: the gateway has its own PR gate (gateway-check.yml)
+# with a slow container docker build, so fleet-only PRs must not trigger it (and
+# vice-versa) — hence the tight path filters below.
+#
+# PR-ONLY: push to main is owned by the ordered pipeline (deploy-staging.yml),
+# which runs its own per-app check jobs before each deploy. This gate validates
+# every env config (default + staging) via dry-runs.
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/fleet-check.yml"
+      - ".github/workflows/deploy-staging.yml"
+      - ".github/workflows/deploy-production.yml"
+      - ".github/actions/**"
+      - "apps/bot-fleet/**"
+      - "apps/fleet-manager/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fleet-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (if present)
+        run: pnpm -r --if-present lint
+
+      - name: Test (if present)
+        run: pnpm -r --if-present test
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      # `wrangler deploy --dry-run` bundles + validates each worker's config
+      # locally (no Cloudflare credentials or upload). Catches binding/config and
+      # TypeScript bundling errors before deploy. We validate EVERY env the deploy
+      # workflow uses, so a staging-only config error can't slip past this gate.
+      # (The Hyperdrive/D1 placeholder tokens in the env blocks are tolerated by
+      # dry-run.)
+      - name: Validate bot-fleet wrangler config (default)
+        run: pnpm --filter bot-fleet exec wrangler deploy --dry-run
+
+      - name: Validate bot-fleet wrangler config (staging)
+        run: pnpm --filter bot-fleet exec wrangler deploy --dry-run --env staging
+
+      - name: Validate bot-fleet wrangler config (us/uk/au-production)
+        run: |
+          for r in us uk au; do
+            pnpm --filter bot-fleet exec wrangler deploy --dry-run --env "$r-production"
+          done
+
+      - name: Validate fleet-manager wrangler config (default)
+        run: pnpm --filter fleet-manager exec wrangler deploy --dry-run
+
+      - name: Validate fleet-manager wrangler config (staging)
+        run: pnpm --filter fleet-manager exec wrangler deploy --dry-run --env staging
+
+      - name: Validate fleet-manager wrangler config (us/uk/au-production)
+        run: |
+          for r in us uk au; do
+            pnpm --filter fleet-manager exec wrangler deploy --dry-run --env "$r-production"
+          done

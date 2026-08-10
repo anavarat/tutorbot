@@ -1,0 +1,30 @@
+-- Gateway container liveness probe (traffic light #2 "actual" signal).
+--
+-- `gateways.status` (0004) is CONTROL-PLANE MEMBERSHIP: it says "this is a real
+-- fleet gateway that accepts pins" (register -> active; reap -> row deleted). It
+-- is read by listActiveIds() for provision/reassign validation + routing, so it
+-- MUST NOT be overloaded with transient container health — a briefly-down
+-- container (deploy / cold start / idle) is still a legit gateway that should
+-- keep accepting bots. Membership != health.
+--
+-- So health lives in a SEPARATE, probe-derived column and never touches the
+-- provisioning roster. The 5-minute connection health sweep (reconcileConnections)
+-- already calls each gateway's container GET /connections; it now derives a health
+-- value from that single call and records it here. No per-refresh probe — the
+-- signal is amortised onto a sweep that already runs, so idle containers are never
+-- woken just to colour a light. Only gateways with running bots pinned get probed.
+--
+--   last_probe_at     -- epoch ms of the last sweep that probed this gateway, or
+--                        NULL if never probed (e.g. no running bots pinned). The UI
+--                        treats a STALE or NULL probe as "no recent signal".
+--   last_probe_health -- derived from GET /connections at the last probe:
+--                          'active'   = ok:true and >=1 live socket  (green)
+--                          'inactive' = ok:true and zero live sockets (yellow)
+--                          'degraded' = probe unreachable / non-2xx    (red)
+--                        NULL = never probed.
+--
+-- NULLABLE, no default: SQLite ADD COLUMN on a populated table forbids NOT NULL
+-- without a default; a pre-existing gateway simply has no probe yet. Non-
+-- destructive ADD COLUMN (mirrors 0005 / 0006).
+ALTER TABLE gateways ADD COLUMN last_probe_at INTEGER;
+ALTER TABLE gateways ADD COLUMN last_probe_health TEXT;

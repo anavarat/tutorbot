@@ -1,0 +1,254 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "platform-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-02",
+  "workers_dev": true,
+  "tsconfig": "tsconfig.json",
+
+  // Default (dev-local) target. Named staging environment is below.
+  "vars": {
+    "APP_ENV": "dev-local",
+    "APP_VERSION": "0.0.0",
+    // NOTE: the gateway roster is NOT a var here. FleetManager (D1) owns it; this
+    // Worker fetches the active roster via the FLEET_MANAGER service binding
+    // (cached in-isolate, see src/modules/gateway/roster.ts).
+
+    // Non-secret Postgres (Supabase) connection parts. The Worker assembles the
+    // DSN from these + the DB_PASSWORD Secrets Store secret (src/modules/db/dsn.ts,
+    // password URL-encoded) and forwards it to the container per-request in the
+    // request BODY (never a header/URL — invocation logs capture those in
+    // plaintext). Only the password is a secret; user/host are not.
+    // Supabase: user is `postgres.<project-ref>`, host is the session pooler.
+    "DB_USER": "postgres.YOUR_PROJECT_REF",
+    "DB_HOST": "aws-0-YOUR_REGION.pooler.supabase.com",
+    "DB_PORT": "5432",
+    "DB_NAME": "postgres"
+  },
+
+  // Only the DB PASSWORD is a secret — it comes from the account SECRETS STORE
+  // (not a per-Worker secret, not `vars`, not the image). The Worker reads it at
+  // runtime via env.DB_PASSWORD.get() (cached in-isolate, see src/modules/db/dsn.ts),
+  // assembles the DSN with the non-secret DB_* vars above, and forwards it to the
+  // container per-request in the request BODY (never a header/URL). Rotate = update
+  // the Secrets Store secret; no redeploy.
+  // store_id + secret_name are stable ids from `wrangler secrets-store list`.
+  "secrets_store_secrets": [
+    {
+      "binding": "DB_PASSWORD",
+      "store_id": "YOUR_SECRETS_STORE_ID",
+      "secret_name": "DB_PASSWORD"
+    }
+  ],
+
+  // App-level MTProto creds (TELEGRAM_API_ID / TELEGRAM_API_HASH) are per-Worker
+  // secrets, NOT in this file and NOT the Secrets Store: set them out-of-band with
+  //   wrangler secret put TELEGRAM_API_ID    [--env staging]
+  //   wrangler secret put TELEGRAM_API_HASH  [--env staging]
+  // They arrive as plain string bindings (sync, unlike DB_PASSWORD.get()) so
+  // GatewayContainer.buildContainerEnv can forward them into the container env at
+  // construct time. Local dev: put them in apps/platform-gateway/worker/.dev.vars
+  // (git-ignored). See WorkerBindings.TELEGRAM_API_ID.
+
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    // Native zero-config distributed tracing. `enabled: true` above is LOGS ONLY —
+    // traces need this explicit block. CAVEAT: this traces the WORKER isolate + its
+    // call INTO the container; the container's own Node code is a separate runtime
+    // and is NOT auto-traced (that needs OTel inside the container). Inherited.
+    "traces": { "enabled": true, "head_sampling_rate": 1 }
+  },
+
+  // INTERNAL Worker-to-Worker binding to the FleetManager control-plane Worker.
+  // GET /bot-gateway uses env.FLEET_MANAGER to resolve botId -> gatewayId. Because
+  // it's a service binding, the dispatch bypasses Access + CORS (no service token
+  // needed). "service" must match FleetManager's deployed Worker name.
+  "services": [{ "binding": "FLEET_MANAGER", "service": "fleet-manager" }],
+
+  "durable_objects": {
+    "bindings": [{ "name": "GATEWAY_CONTAINER", "class_name": "GatewayContainer" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GatewayContainer"] }],
+
+  "containers": [
+    {
+      "name": "platform-gateway",
+      "class_name": "GatewayContainer",
+      "image": "../container/Dockerfile",
+      "image_build_context": "../../..",
+      "instance_type": "lite",
+      // Ceiling on concurrently running containers, NOT an eager count. Real count
+      // = distinct gateway names actually addressed (the active roster owned by
+      // FleetManager). Must be >= number of gateways in use.
+      "max_instances": 10,
+      "rollout_step_percentage": [100]
+    }
+  ],
+
+  // ---------------------------------------------------------------------------
+  // Named environments (same Cloudflare account). The worker `name` auto-suffixes
+  // to platform-gateway-staging / platform-gateway-us-production. Only top-level
+  // `migrations` + `observability` + `compatibility_date` are INHERITED; every
+  // binding (vars, services, durable_objects, containers, secrets_store_secrets) is
+  // NOT inherited and is re-declared per env.
+  //   - image_build_context is "../../.." (repo root is 3 levels up).
+  //   - FLEET_MANAGER binds the ENV-SUFFIXED fleet-manager-<env> worker.
+  //   - container `name` is env-suffixed so envs never collide on one container
+  //     application name.
+  //   - Keeps the Option-B DB wiring (DB_* vars + DB_PASSWORD from the Secrets
+  //     Store), pointed at Supabase.
+  // REGIONAL DEPLOYMENTS (operational isolation). `placement.region` pins the
+  // Worker; the GATEWAY_CONTAINER (DO-backed container) is created near the Worker's
+  // first touch, so it lands in-region transitively. staging is single/AU;
+  // production fans out to us/uk/au. Each region has its OWN region-suffixed
+  // container + FLEET_MANAGER sibling + Secrets Store (PROD_<r>_SECRETS_STORE_ID)
+  // + regional secret DB_<R>_PRODUCTION_PASSWORD + per-region Supabase host.
+  //   Region map:  us -> aws:us-east-1 | uk -> aws:eu-west-2 | au -> aws:ap-southeast-2
+  // NOTE(container region): CF container placement supports only ENAM/WNAM/EEUR/WEUR
+  //   (no APAC); we do NOT pin containers[].placement — it follows the Worker via
+  //   first-touch (best-effort), which is enough for operational isolation.
+  // FILL BEFORE PROD DEPLOY: each region's DB_HOST is a placeholder until its
+  //   Supabase (or Postgres) origin exists.
+  // ---------------------------------------------------------------------------
+  "env": {
+    "staging": {
+      "placement": { "region": "aws:ap-southeast-2" },
+      "vars": {
+        "APP_ENV": "staging",
+        "APP_VERSION": "0.0.0-staging",
+        "DB_USER": "postgres.YOUR_PROJECT_REF",
+        "DB_HOST": "aws-0-YOUR_REGION.pooler.supabase.com",
+        "DB_PORT": "5432",
+        "DB_NAME": "postgres"
+      },
+      "secrets_store_secrets": [
+        {
+          "binding": "DB_PASSWORD",
+          // store_id is a PLACEHOLDER TOKEN; resolve/create the Secrets Store and
+          // paste its id (`wrangler secrets-store list`).
+          "store_id": "STAGING_SECRETS_STORE_ID",
+          "secret_name": "DB_STAGING_PASSWORD"
+        }
+      ],
+      "services": [{ "binding": "FLEET_MANAGER", "service": "fleet-manager-staging" }],
+      "durable_objects": {
+        "bindings": [{ "name": "GATEWAY_CONTAINER", "class_name": "GatewayContainer" }]
+      },
+      "containers": [
+        {
+          "name": "platform-gateway-staging",
+          "class_name": "GatewayContainer",
+          "image": "../container/Dockerfile",
+          "image_build_context": "../../..",
+          "instance_type": "lite",
+          "max_instances": 50,
+          "rollout_step_percentage": [50, 100],
+          "rollout_active_grace_period": 60
+        }
+      ]
+    },
+    "us-production": {
+      "placement": { "region": "aws:us-east-1" },
+      "vars": {
+        "APP_ENV": "us-production",
+        "APP_VERSION": "0.0.0-us-production",
+        "DB_USER": "postgres.YOUR_PROJECT_REF",
+        "DB_HOST": "REPLACE_us_DB_HOST",
+        "DB_PORT": "5432",
+        "DB_NAME": "postgres"
+      },
+      "secrets_store_secrets": [
+        {
+          "binding": "DB_PASSWORD",
+          "store_id": "PROD_us_SECRETS_STORE_ID",
+          "secret_name": "DB_US_PRODUCTION_PASSWORD"
+        }
+      ],
+      "services": [{ "binding": "FLEET_MANAGER", "service": "fleet-manager-us-production" }],
+      "durable_objects": {
+        "bindings": [{ "name": "GATEWAY_CONTAINER", "class_name": "GatewayContainer" }]
+      },
+      "containers": [
+        {
+          "name": "platform-gateway-us-production",
+          "class_name": "GatewayContainer",
+          "image": "../container/Dockerfile",
+          "image_build_context": "../../..",
+          "instance_type": "lite",
+          "max_instances": 2,
+          "rollout_step_percentage": [50, 100],
+          "rollout_active_grace_period": 60
+        }
+      ]
+    },
+    "uk-production": {
+      "placement": { "region": "aws:eu-west-2" },
+      "vars": {
+        "APP_ENV": "uk-production",
+        "APP_VERSION": "0.0.0-uk-production",
+        "DB_USER": "postgres.YOUR_PROJECT_REF",
+        "DB_HOST": "REPLACE_uk_DB_HOST",
+        "DB_PORT": "5432",
+        "DB_NAME": "postgres"
+      },
+      "secrets_store_secrets": [
+        {
+          "binding": "DB_PASSWORD",
+          "store_id": "PROD_uk_SECRETS_STORE_ID",
+          "secret_name": "DB_UK_PRODUCTION_PASSWORD"
+        }
+      ],
+      "services": [{ "binding": "FLEET_MANAGER", "service": "fleet-manager-uk-production" }],
+      "durable_objects": {
+        "bindings": [{ "name": "GATEWAY_CONTAINER", "class_name": "GatewayContainer" }]
+      },
+      "containers": [
+        {
+          "name": "platform-gateway-uk-production",
+          "class_name": "GatewayContainer",
+          "image": "../container/Dockerfile",
+          "image_build_context": "../../..",
+          "instance_type": "lite",
+          "max_instances": 2,
+          "rollout_step_percentage": [50, 100],
+          "rollout_active_grace_period": 60
+        }
+      ]
+    },
+    "au-production": {
+      "placement": { "region": "aws:ap-southeast-2" },
+      "vars": {
+        "APP_ENV": "au-production",
+        "APP_VERSION": "0.0.0-au-production",
+        "DB_USER": "postgres.YOUR_PROJECT_REF",
+        "DB_HOST": "REPLACE_au_DB_HOST",
+        "DB_PORT": "5432",
+        "DB_NAME": "postgres"
+      },
+      "secrets_store_secrets": [
+        {
+          "binding": "DB_PASSWORD",
+          "store_id": "PROD_au_SECRETS_STORE_ID",
+          "secret_name": "DB_AU_PRODUCTION_PASSWORD"
+        }
+      ],
+      "services": [{ "binding": "FLEET_MANAGER", "service": "fleet-manager-au-production" }],
+      "durable_objects": {
+        "bindings": [{ "name": "GATEWAY_CONTAINER", "class_name": "GatewayContainer" }]
+      },
+      "containers": [
+        {
+          "name": "platform-gateway-au-production",
+          "class_name": "GatewayContainer",
+          "image": "../container/Dockerfile",
+          "image_build_context": "../../..",
+          "instance_type": "lite",
+          "max_instances": 2,
+          "rollout_step_percentage": [50, 100],
+          "rollout_active_grace_period": 60
+        }
+      ]
+    }
+  }
+}

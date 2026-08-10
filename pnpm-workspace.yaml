@@ -1,0 +1,24 @@
+packages:
+  - "apps/*"
+  - "apps/platform-gateway/*"
+  - "packages/*"
+
+# pnpm 11 reads pnpm-specific settings from here (not just .npmrc).
+# Don't block `pnpm exec`/`pnpm run` on the deps-status gate.
+verifyDepsBeforeRun: false
+
+# pnpm 11 replaced `onlyBuiltDependencies` with `allowBuilds` (name -> true/false).
+# Approve native build scripts so there's no "ignored builds" failure in CI
+# (esbuild + workerd are required for `wrangler deploy`; sharp for image work).
+allowBuilds:
+  core-js-pure: true
+  esbuild: true
+  sharp: true
+  workerd: true
+
+# bot-fleet/fleet-manager intentionally use @cloudflare/workers-types v5.
+# wrangler and partyserver (via agents) declare a conservative ^4.x peer range,
+# but v5 is compatible (typecheck passes). Silence the unmet-peer warnings.
+peerDependencyRules:
+  allowedVersions:
+    "@cloudflare/workers-types": "5"

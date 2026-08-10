@@ -1,0 +1,27 @@
+-- Per-bot gateway->platform connect error (traffic light #4 "actual" negative signal).
+--
+-- Light #4 (bot's gateway->tg/wa socket) previously had NO failure input: it was
+-- derived ONLY from the recency of the last SENT message, so it could show green
+-- (recent send) or gray (idle/unknown) but NEVER red. A hard connect failure
+-- (e.g. AUTH_KEY_DUPLICATED, session_unauthorized) produced NO send, so the light
+-- fell to gray -- indistinguishable from "idle". The failure WAS observed (the
+-- 5-min heal sweep, reconcileConnections, re-connects each running bot that has no
+-- live socket and gets back the container's connect error) but was DISCARDED: the
+-- outcome went only to the sweep result / logs, never to a queryable health state.
+--
+-- These columns persist that per-bot connect error so light #4 can go RED on a
+-- KNOWN, recently-observed failure. Written by reconcileConnections:
+--   reconnect fails  -> record the error + timestamp
+--   reconnect ok / bot already has a live socket -> cleared back to NULL
+--
+--   last_conn_error    -- the container's last connect error for this bot, e.g.
+--                         'session_unauthorized' or the raw MTProto message
+--                         (AUTH_KEY_DUPLICATED). NULL = no recent failure.
+--   last_conn_error_at -- epoch ms the error was last observed by a sweep. The UI
+--                         treats a STALE error (older than FRESH_TTL) as gray, not
+--                         red -- a negative signal is only trusted while fresh.
+--
+-- NULLABLE, no default: SQLite ADD COLUMN on a populated table forbids NOT NULL
+-- without a default. Non-destructive ADD COLUMN (mirrors 0005 / 0006 / 0007).
+ALTER TABLE bots ADD COLUMN last_conn_error TEXT;
+ALTER TABLE bots ADD COLUMN last_conn_error_at INTEGER;

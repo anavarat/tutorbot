@@ -1,0 +1,10 @@
+.local
+node_modules
+.wrangler
+dist
+coverage
+.dev.vars
+*.log
+.DS_Store
+worker-configuration.d.ts
+.local
