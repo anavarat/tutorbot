@@ -1,0 +1,253 @@
+.dockerignore
+  s_6e01a1d2ed993d::t_366a2b642465ae 1-34
+.github/workflows/fleet-check.yml
+  s_6e01a1d2ed993d::t_156945386fa2c2 1-92
+.github/workflows/gateway-check.yml
+  s_6e01a1d2ed993d::t_4bb8d781a3c10d 1-85
+.gitignore
+  s_6e01a1d2ed993d::t_95d3bb939fd154 1-10
+.npmrc
+  s_6e01a1d2ed993d::t_40f3a5889fc0ca 1
+apps/bot-fleet/package.json
+  s_6e01a1d2ed993d::t_3d7d15841cc7d0 1-30
+apps/bot-fleet/src/app.ts
+  s_6e01a1d2ed993d::t_888518f79aaf28 1-46
+apps/bot-fleet/src/control-routes.test.ts
+  s_6e01a1d2ed993d::t_ec25abe95e652e 1-123
+apps/bot-fleet/src/control-routes.ts
+  s_6e01a1d2ed993d::t_f03dd113d5dfbe 1-84
+apps/bot-fleet/src/docs/routes.ts
+  s_6e01a1d2ed993d::t_eed6cd9aea1fcd 1-40
+apps/bot-fleet/src/docs/spec.ts
+  s_6e01a1d2ed993d::t_808e0e305e1582 1-184
+apps/bot-fleet/src/index.ts
+  s_6e01a1d2ed993d::t_31723761e0f4fc 1-21
+apps/bot-fleet/src/platform/gateway/gateway-client.ts
+  s_6e01a1d2ed993d::t_48dc2bf1f4f70a 1-120
+apps/bot-fleet/tsconfig.json
+  s_6e01a1d2ed993d::t_fae4eb18d0b264 1-16
+apps/fleet-manager/migrations/0001_init.sql
+  s_6e01a1d2ed993d::t_9b6feb6efd8555 1-23
+apps/fleet-manager/migrations/0002_reconcile_bots_gateway_id.sql
+  s_6e01a1d2ed993d::t_b95447837fea13 1-31
+apps/fleet-manager/migrations/0003_add_bots_persona_name.sql
+  s_6e01a1d2ed993d::t_ac4fcc6b7e8bf9 1-12
+apps/fleet-manager/migrations/0004_create_gateways.sql
+  s_6e01a1d2ed993d::t_75f309dba7e78f 1-32
+apps/fleet-manager/migrations/0005_add_bots_telegram_creds.sql
+  s_6e01a1d2ed993d::t_e2151d8608020d 1-31
+apps/fleet-manager/migrations/0006_add_bots_reassign_saga.sql
+  s_6e01a1d2ed993d::t_ec7b06262742ac 1-35
+apps/fleet-manager/migrations/0007_add_gateways_probe.sql
+  s_6e01a1d2ed993d::t_8e97fd1b8c07e5 1-30
+apps/fleet-manager/migrations/0008_add_bots_conn_error.sql
+  s_6e01a1d2ed993d::t_962b0b3c37b925 1-27
+apps/fleet-manager/package.json
+  s_6e01a1d2ed993d::t_f89c6d147fc870 1-34
+apps/fleet-manager/scripts/auth-ui.ts
+  s_6e01a1d2ed993d::t_9274fcf19b0c2c 1-223
+apps/fleet-manager/scripts/auth.ts
+  s_6e01a1d2ed993d::t_0a43b116e94e06 1-111
+apps/fleet-manager/src/app.ts
+  s_6e01a1d2ed993d::t_197000e6862e51 1-80
+apps/fleet-manager/src/index.ts
+  s_6e01a1d2ed993d::t_4da57c668176db 1-18
+apps/fleet-manager/src/lib/http.ts
+  s_6e01a1d2ed993d::t_efab146d63bd22 1-22
+apps/fleet-manager/src/modules/bots/controller.ts
+  s_6e01a1d2ed993d::t_0ed714160adde5 1-190
+apps/fleet-manager/src/modules/bots/routes.ts
+  s_6e01a1d2ed993d::t_be37178229e70f 1-27
+apps/fleet-manager/src/modules/bots/schema.test.ts
+  s_6e01a1d2ed993d::t_58c3547731a423 1-103
+apps/fleet-manager/src/modules/bots/schema.ts
+  s_6e01a1d2ed993d::t_1c3ed5d3348db0 1-70
+apps/fleet-manager/src/modules/bots/service.test.ts
+  s_6e01a1d2ed993d::t_cfca4c062a0c9b 1-893
+apps/fleet-manager/src/modules/bots/service.ts
+  s_6e01a1d2ed993d::t_87a323670ce62b 1-635
+apps/fleet-manager/src/modules/docs/routes.ts
+  s_6e01a1d2ed993d::t_19f62dbabf3682 1-35
+apps/fleet-manager/src/modules/docs/spec.ts
+  s_6e01a1d2ed993d::t_9070c3a9a26130 1-685
+apps/fleet-manager/src/modules/gateways/controller.test.ts
+  s_6e01a1d2ed993d::t_a444cae6409780 1-61
+apps/fleet-manager/src/modules/gateways/controller.ts
+  s_6e01a1d2ed993d::t_a5d260d345692b 1-138
+apps/fleet-manager/src/modules/gateways/routes.ts
+  s_6e01a1d2ed993d::t_8a489678ba1cfd 1-33
+apps/fleet-manager/src/modules/gateways/schema.test.ts
+  s_6e01a1d2ed993d::t_48eec212fc8ee8 1-28
+apps/fleet-manager/src/modules/gateways/schema.ts
+  s_6e01a1d2ed993d::t_c4ef7ca30398b0 1-16
+apps/fleet-manager/src/modules/gateways/service.test.ts
+  s_6e01a1d2ed993d::t_2cd045e49ed371 1-151
+apps/fleet-manager/src/modules/gateways/service.ts
+  s_6e01a1d2ed993d::t_9083addf232fc4 1-87
+apps/fleet-manager/src/modules/monitor/routes.ts
+  s_6e01a1d2ed993d::t_745ed83367847a 1-36
+apps/fleet-manager/src/modules/personas/routes.ts
+  s_6e01a1d2ed993d::t_cf343e81982663 1-20
+apps/fleet-manager/src/modules/ui/routes.ts
+  s_6e01a1d2ed993d::t_3ac523f4e38209 1-907
+apps/fleet-manager/src/platform/botfleet/bot-runtime.test.ts
+  s_6e01a1d2ed993d::t_44fe123495d9cc 1-70
+apps/fleet-manager/src/platform/botfleet/bot-runtime.ts
+  s_6e01a1d2ed993d::t_2de66c736aca3f 1-78
+apps/fleet-manager/src/platform/gateway/gateway-connection.ts
+  s_6e01a1d2ed993d::t_0e061a4434d4ff 1-177
+apps/fleet-manager/src/platform/gateway/gateway-directory.ts
+  s_6e01a1d2ed993d::t_16621224ec22fd 1-96
+apps/fleet-manager/src/platform/gateway/gateway-lifecycle.ts
+  s_6e01a1d2ed993d::t_fb52acefa77652 1-46
+apps/fleet-manager/src/platform/hyperdrive/message-repo.ts
+  s_6e01a1d2ed993d::t_a81740f4e2a4bc 1-166
+apps/fleet-manager/src/platform/hyperdrive/persona-repo.ts
+  s_6e01a1d2ed993d::t_9440f0ba5830cb 1-29
+apps/fleet-manager/src/platform/persistence/bots-dao.ts
+  s_6e01a1d2ed993d::t_42bc2c609260b3 1-307
+apps/fleet-manager/src/platform/persistence/gateways-dao.ts
+  s_6e01a1d2ed993d::t_708c39e4e86624 1-151
+apps/fleet-manager/src/scheduled.ts
+  s_6e01a1d2ed993d::t_289b48a1962e61 1-74
+apps/fleet-manager/src/types.ts
+  s_6e01a1d2ed993d::t_fefa98643096ed 1-75
+apps/fleet-manager/tsconfig.json
+  s_6e01a1d2ed993d::t_34c3d2547a4043 1-16
+apps/platform-gateway/container/Dockerfile
+  s_6e01a1d2ed993d::t_2ac1d51196b08e 1-50
+apps/platform-gateway/container/package.json
+  s_6e01a1d2ed993d::t_7fb765bb6fe991 1-28
+apps/platform-gateway/container/src/app.test.ts
+  s_6e01a1d2ed993d::t_141dda49ec9f9b 1-38
+apps/platform-gateway/container/src/app.ts
+  s_6e01a1d2ed993d::t_64f5c10c2e2482 1-20
+apps/platform-gateway/container/src/domain/messaging/inbound-filter.ts
+  s_6e01a1d2ed993d::t_ff7c5817d54cb5 1-76
+apps/platform-gateway/container/src/index.ts
+  s_6e01a1d2ed993d::t_07572ca29cf6b7 1-78
+apps/platform-gateway/container/src/modules/db/pool.ts
+  s_6e01a1d2ed993d::t_99fabde9a96cbf 1-45
+apps/platform-gateway/container/src/modules/docs/routes.ts
+  s_6e01a1d2ed993d::t_579348fcac231b 1-42
+apps/platform-gateway/container/src/modules/docs/spec.ts
+  s_6e01a1d2ed993d::t_c99921224ac67e 1-336
+apps/platform-gateway/container/src/modules/messaging-connections/controller.ts
+  s_6e01a1d2ed993d::t_1fd1dadff3621b 1-139
+apps/platform-gateway/container/src/modules/messaging-connections/outbound.test.ts
+  s_6e01a1d2ed993d::t_6d2afc079fcc07 1-115
+apps/platform-gateway/container/src/modules/messaging-connections/outbound.ts
+  s_6e01a1d2ed993d::t_a6e708853197df 1-81
+apps/platform-gateway/container/src/modules/messaging-connections/routes.ts
+  s_6e01a1d2ed993d::t_02d0dd1869749c 1-23
+apps/platform-gateway/container/src/modules/messaging-connections/schema.ts
+  s_6e01a1d2ed993d::t_4aaaaf1de8110c 1-34
+apps/platform-gateway/container/src/modules/messaging-connections/service.test.ts
+  s_6e01a1d2ed993d::t_fea5a07dd213a3 1-257
+apps/platform-gateway/container/src/modules/messaging-connections/service.ts
+  s_6e01a1d2ed993d::t_5aa8101a0bc858 1-264
+apps/platform-gateway/container/src/modules/messaging-connections/state.ts
+  s_6e01a1d2ed993d::t_00a7f88e5fb7cb 1-51
+apps/platform-gateway/container/src/modules/messaging/routes.ts
+  s_6e01a1d2ed993d::t_459f68027299e3 1-114
+apps/platform-gateway/container/src/modules/messaging/store.ts
+  s_6e01a1d2ed993d::t_d3211caf1802a4 1-185
+apps/platform-gateway/container/src/modules/system/contracts.ts
+  s_6e01a1d2ed993d::t_d35ae2ab1ef4bb 1-30
+apps/platform-gateway/container/src/modules/system/lifecycle.test.ts
+  s_6e01a1d2ed993d::t_daf28ec014e80a 1-63
+apps/platform-gateway/container/src/modules/system/lifecycle.ts
+  s_6e01a1d2ed993d::t_fa87ce86d5135b 1-39
+apps/platform-gateway/container/src/modules/system/routes.ts
+  s_6e01a1d2ed993d::t_5c23d4b4fcaf04 1-13
+apps/platform-gateway/container/src/platform/telegram/client.ts
+  s_6e01a1d2ed993d::t_6363b4aeeaed5b 1-356
+apps/platform-gateway/container/tsconfig.json
+  s_6e01a1d2ed993d::t_73bc3fd0a261ce 1-20
+apps/platform-gateway/worker/src/app.test.ts
+  s_6e01a1d2ed993d::t_a872e4e45f528e 1-138
+apps/platform-gateway/worker/src/app.ts
+  s_6e01a1d2ed993d::t_1a35d0f660e001 1-17
+apps/platform-gateway/worker/src/durable-objects/GatewayContainer.ts
+  s_6e01a1d2ed993d::t_d58fbab729f17d 1-255
+apps/platform-gateway/worker/src/durable-objects/session-store.test.ts
+  s_6e01a1d2ed993d::t_c7c1c70b1a9e8d 1-83
+apps/platform-gateway/worker/src/durable-objects/session-store.ts
+  s_6e01a1d2ed993d::t_0b655cd0d6a3ed 1-107
+apps/platform-gateway/worker/src/index.ts
+  s_6e01a1d2ed993d::t_0b95dd31e7efd5 1-15
+apps/platform-gateway/worker/src/modules/docs/routes.ts
+  s_6e01a1d2ed993d::t_a902aa3df2d539 1-40
+apps/platform-gateway/worker/src/modules/docs/spec.ts
+  s_6e01a1d2ed993d::t_40101cc8f9dbab 1-616
+apps/platform-gateway/worker/src/modules/gateway/dsn-transport.test.ts
+  s_6e01a1d2ed993d::t_b4ce1cfc8f5d91 1-113
+apps/platform-gateway/worker/src/modules/gateway/gateway.ts
+  s_6e01a1d2ed993d::t_8260082a5bc721 1-130
+apps/platform-gateway/worker/src/modules/gateway/roster.ts
+  s_6e01a1d2ed993d::t_163fe2492d706b 1-85
+apps/platform-gateway/worker/src/modules/gateway/routes.ts
+  s_6e01a1d2ed993d::t_3f2baa5ff8979a 1-344
+apps/platform-gateway/worker/src/modules/system/containerProxy.test.ts
+  s_6e01a1d2ed993d::t_dabed86e53ad2d 1-78
+apps/platform-gateway/worker/src/modules/system/containerProxy.ts
+  s_6e01a1d2ed993d::t_948cdf7a481260 1-121
+apps/platform-gateway/worker/src/modules/system/routes.ts
+  s_6e01a1d2ed993d::t_eb725fbc4f2d2f 1-44
+apps/platform-gateway/worker/tsconfig.json
+  s_6e01a1d2ed993d::t_e0e9553bb8b5fd 1-14
+eslint.config.mjs
+  s_6e01a1d2ed993d::t_84c7500061367b 1-50
+package.json
+  s_6e01a1d2ed993d::t_6c9833c137a83a 1-20
+packages/shared/package.json
+  s_6e01a1d2ed993d::t_a006d7f0f04dcc 1-35
+packages/shared/src/constants.ts
+  s_6e01a1d2ed993d::t_ff5a78d9c67be3 1-22
+packages/shared/src/errorCodes.ts
+  s_6e01a1d2ed993d::t_03a2ae7c50d9e9 1-7
+packages/shared/src/index.ts
+  s_6e01a1d2ed993d::t_bce80ca279bcfb 1-12
+packages/shared/src/keys.test.ts
+  s_6e01a1d2ed993d::t_96ecf26556f378 1-48
+packages/shared/src/keys.ts
+  s_6e01a1d2ed993d::t_0fa9b346b86edc 1-110
+packages/shared/src/observability/correlation.ts
+  s_6e01a1d2ed993d::t_6e148d59cdedd6 1-42
+packages/shared/src/observability/index.ts
+  s_6e01a1d2ed993d::t_f6af78d4ae6a6c 1-12
+packages/shared/src/observability/log-sanitizer.ts
+  s_6e01a1d2ed993d::t_2d32b53f7e4d57 1-117
+packages/shared/src/observability/observability.test.ts
+  s_6e01a1d2ed993d::t_0a50230c61ff97 1-112
+packages/shared/src/observability/stage-log.ts
+  s_6e01a1d2ed993d::t_57e925b9c4c454 1-123
+packages/shared/src/rpc.ts
+  s_6e01a1d2ed993d::t_2f132b25fde56f 1-109
+packages/shared/src/runtimeContracts.ts
+  s_6e01a1d2ed993d::t_bca6c67f1e2333 1-34
+packages/shared/tsconfig.json
+  s_6e01a1d2ed993d::t_be86a86c056989 1-20
+pnpm-lock.yaml
+  s_6e01a1d2ed993d::t_a82997e4e5ccdd 1-5045
+pnpm-workspace.yaml
+  s_6e01a1d2ed993d::t_4c9170c084d138 1-24
+tsconfig.base.json
+  s_6e01a1d2ed993d::t_3330ee246ebdd1 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "a06d67509874dab9244b0ca1b5d816900b1d18f6",
+  "prompts": {},
+  "sessions": {
+    "s_6e01a1d2ed993d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0d4f459a6ffe3hKwxir4wrE3Ve",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Kuber Gaur <kgaur@cloudflare.com>"
+    }
+  }
+}
