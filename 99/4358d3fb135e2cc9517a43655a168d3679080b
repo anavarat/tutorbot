@@ -1,0 +1,19 @@
+.github/workflows/deploy-staging.yml
+  s_6e01a1d2ed993d::t_ccc413b9e0bb0f 390-391
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "994358d3fb135e2cc9517a43655a168d3679080b",
+  "prompts": {},
+  "sessions": {
+    "s_6e01a1d2ed993d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0d4f459a6ffe3hKwxir4wrE3Ve",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Kuber Gaur <kgaur@cloudflare.com>"
+    }
+  }
+}
