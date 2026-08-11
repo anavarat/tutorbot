@@ -188,6 +188,9 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.region }}-production
+    # fleet-manager also forward-references the gateway (GATEWAY binding); see fm-finalize.
+    outputs:
+      stripped: ${{ steps.guard.outputs.stripped }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -227,6 +230,16 @@ jobs:
       - name: Apply D1 migrations (${{ inputs.region }}-production, remote)
         working-directory: apps/fleet-manager
         run: pnpm exec wrangler d1 migrations apply tutorbot-fleet-registry-${{ inputs.region }}-production --env ${{ inputs.region }}-production --remote
+      # Cold-start guard: fleet-manager also binds GATEWAY -> platform-gateway-<r>-production.
+      # Strip only that binding if the gateway does not exist yet (BOT_FLEET stays).
+      - name: Ensure GATEWAY target exists (cold-start guard)
+        id: guard
+        uses: ./.github/actions/ensure-binding-target
+        with:
+          target-script: tutorbot-platform-gateway-${{ inputs.region }}-production
+          binding-name: GATEWAY
+          env-name: ${{ inputs.region }}-production
+          working-directory: apps/fleet-manager
       - name: Deploy fleet-manager (${{ inputs.region }}-production)
         working-directory: apps/fleet-manager
         run: pnpm exec wrangler deploy --env ${{ inputs.region }}-production
@@ -360,12 +373,62 @@ jobs:
         working-directory: apps/bot-fleet
         run: pnpm exec wrangler deploy --env ${{ inputs.region }}-production
 
+  # 8) fleet-manager FINALIZE (cold-start only) --------------------------------
+  # fleet-manager also forward-references the gateway. If fm-deploy stripped its
+  # GATEWAY binding, redeploy with the full config now that the gateway exists.
+  fm-finalize:
+    name: fm ${{ inputs.region }} finalize
+    needs: [fm-deploy, pgw-deploy]
+    if: ${{ needs.fm-deploy.outputs.stripped == 'true' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.region }}-production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build shared package
+        run: pnpm --filter "@tutorbot/shared" build
+      - name: Pin ${{ inputs.region }} D1 id (resolve-only)
+        uses: ./.github/actions/pin-resource-id
+        with:
+          api-path: d1/database
+          id-field: uuid
+          resource-name: tutorbot-fleet-registry-${{ inputs.region }}-production
+          placeholder: PROD_${{ inputs.region }}_D1_ID
+          working-directory: apps/fleet-manager
+      - name: Pin ${{ inputs.region }} Hyperdrive id (resolve-only)
+        uses: ./.github/actions/pin-resource-id
+        with:
+          api-path: hyperdrive/configs
+          id-field: id
+          resource-name: tutorbot-supabase-${{ inputs.region }}-production
+          placeholder: PROD_${{ inputs.region }}_HYPERDRIVE_ID
+          working-directory: apps/fleet-manager
+      - name: Redeploy fleet-manager with GATEWAY binding (${{ inputs.region }}-production)
+        working-directory: apps/fleet-manager
+        run: pnpm exec wrangler deploy --env ${{ inputs.region }}-production
+
 # COLD ENVIRONMENT NOTE ------------------------------------------------------
 # The in-region service-binding graph is cyclic (bf -> pgw -> fm -> bf) and
 # same-account Worker->Worker MUST use a binding (workers.dev HTTP is rejected,
 # error 1042), so no binding can be dropped permanently and no strict order
-# satisfies every binding on a cold FIRST deploy. Handled automatically:
-# bf-deploy's cold-start guard (ensure-binding-target) ephemerally drops the
-# GATEWAY binding when platform-gateway-<r>-production does not exist yet, the
-# chain creates all three Workers, then bf-finalize redeploys bot-fleet with the
-# full config once the gateway exists. No manual steps, no committed changes.
+# satisfies every binding on a cold FIRST deploy. Handled automatically: both
+# bot-fleet AND fleet-manager forward-reference the gateway (GATEWAY binding), so
+# bf-deploy and fm-deploy each run the cold-start guard (ensure-binding-target)
+# which ephemerally drops only their GATEWAY binding when
+# platform-gateway-<r>-production does not exist yet, the chain creates all three
+# Workers, then bf-finalize and fm-finalize redeploy with the full config once
+# the gateway exists. No manual steps, no committed changes.
