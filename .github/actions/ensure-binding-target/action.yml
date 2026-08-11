@@ -72,17 +72,17 @@ runs:
           // trailing commas. Emitted file is plain JSON (comments lost) but valid
           // for wrangler; it is ephemeral (runner checkout, never committed).
           const s = fs.readFileSync(p, "utf8");
-          let out = "", i = 0, inStr = false, q = "", esc = false;
+          let out = "", i = 0, inStr = false, esc = false;
           while (i < s.length) {
             const c = s[i], c2 = s[i + 1];
             if (inStr) {
               out += c;
               if (esc) esc = false;
               else if (c === "\\") esc = true;
-              else if (c === q) inStr = false;
+              else if (c === "\"") inStr = false;
               i++; continue;
             }
-            if (c === "\"" || c === "'") { inStr = true; q = c; out += c; i++; continue; }
+            if (c === "\"") { inStr = true; out += c; i++; continue; }
             if (c === "/" && c2 === "/") { while (i < s.length && s[i] !== "\n") i++; continue; }
             if (c === "/" && c2 === "*") { i += 2; while (i < s.length && !(s[i] === "*" && s[i + 1] === "/")) i++; i += 2; continue; }
             out += c; i++;
