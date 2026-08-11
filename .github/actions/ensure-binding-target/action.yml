@@ -1,0 +1,103 @@
+name: Ensure service-binding target exists
+description: >
+  Cold-start guard for the cyclic service-binding graph (bf -> pgw -> fm -> bf).
+  Same-account Worker->Worker calls MUST use a service binding (workers.dev HTTP
+  is rejected, error 1042), so the binding cannot be dropped permanently. Instead:
+  if the forward-referenced target Worker does not yet exist, EPHEMERALLY strip
+  that one binding from the named env block in the checked-out config (this run
+  only, NOT committed) so the first deploy can succeed. Sets output `stripped`.
+  On steady state (target exists) this is a no-op and the binding is kept.
+
+inputs:
+  target-script:
+    description: "Worker script name the binding points to, e.g. tutorbot-platform-gateway-staging"
+    required: true
+  binding-name:
+    description: "The service binding name to conditionally drop, e.g. GATEWAY"
+    required: true
+  env-name:
+    description: "wrangler named env whose services[] to edit, e.g. staging | us-production"
+    required: true
+  working-directory:
+    description: "Directory containing the wrangler config"
+    required: true
+  config-file:
+    description: "Config filename"
+    required: false
+    default: wrangler.jsonc
+
+outputs:
+  stripped:
+    description: "'true' if the binding was ephemerally removed (cold start), else 'false'"
+    value: ${{ steps.guard.outputs.stripped }}
+
+runs:
+  using: composite
+  steps:
+    - id: guard
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        GUARD_TARGET: ${{ inputs.target-script }}
+        GUARD_BINDING: ${{ inputs.binding-name }}
+        GUARD_ENV: ${{ inputs.env-name }}
+        GUARD_CONFIG: ${{ inputs.config-file }}
+      run: |
+        set -euo pipefail
+        : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN not set}"
+        : "${CLOUDFLARE_ACCOUNT_ID:?CLOUDFLARE_ACCOUNT_ID not set}"
+
+        code=$(curl -s -o /dev/null -w '%{http_code}' \
+          -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+          "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${GUARD_TARGET}")
+
+        if [ "$code" = "200" ]; then
+          echo "target '${GUARD_TARGET}' exists -> keeping '${GUARD_BINDING}' binding (steady state)."
+          echo "stripped=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        if [ "$code" != "404" ]; then
+          echo "::error::unexpected HTTP $code checking worker '${GUARD_TARGET}'"; exit 1
+        fi
+
+        echo "::warning::'${GUARD_TARGET}' not found (cold start) -> ephemerally dropping '${GUARD_BINDING}' from env '${GUARD_ENV}' for this deploy only."
+        node -e '
+          const fs = require("fs");
+          const p = process.env.GUARD_CONFIG;
+          const envName = process.env.GUARD_ENV;
+          const bind = process.env.GUARD_BINDING;
+
+          // Minimal JSONC -> JSON: strip // and /* */ comments while respecting
+          // string literals (so https:// inside strings is preserved), then drop
+          // trailing commas. Emitted file is plain JSON (comments lost) but valid
+          // for wrangler; it is ephemeral (runner checkout, never committed).
+          const s = fs.readFileSync(p, "utf8");
+          let out = "", i = 0, inStr = false, q = "", esc = false;
+          while (i < s.length) {
+            const c = s[i], c2 = s[i + 1];
+            if (inStr) {
+              out += c;
+              if (esc) esc = false;
+              else if (c === "\\") esc = true;
+              else if (c === q) inStr = false;
+              i++; continue;
+            }
+            if (c === "\"" || c === "'") { inStr = true; q = c; out += c; i++; continue; }
+            if (c === "/" && c2 === "/") { while (i < s.length && s[i] !== "\n") i++; continue; }
+            if (c === "/" && c2 === "*") { i += 2; while (i < s.length && !(s[i] === "*" && s[i + 1] === "/")) i++; i += 2; continue; }
+            out += c; i++;
+          }
+          const json = out.replace(/,(\s*[}\]])/g, "$1");
+          const cfg = JSON.parse(json);
+
+          const block = cfg.env && cfg.env[envName];
+          if (!block) { console.error("env block not found: " + envName); process.exit(1); }
+          const before = Array.isArray(block.services) ? block.services.length : 0;
+          block.services = (block.services || []).filter((x) => x.binding !== bind);
+          const after = block.services.length;
+          if (after === before) { console.error("binding not found to strip: " + bind + " in env " + envName); process.exit(1); }
+
+          fs.writeFileSync(p, JSON.stringify(cfg, null, 2) + "\n");
+          console.log("stripped " + bind + " from env " + envName + " (" + before + " -> " + after + " services)");
+        '
+        echo "stripped=true" >> "$GITHUB_OUTPUT"

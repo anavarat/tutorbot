@@ -94,6 +94,11 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: staging
+    # Signals whether the cold-start guard ephemerally dropped bot-fleet's GATEWAY
+    # binding (target platform-gateway-staging did not exist yet). If so, bf-finalize
+    # redeploys bot-fleet with the full config once the gateway exists.
+    outputs:
+      stripped: ${{ steps.guard.outputs.stripped }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -123,6 +128,16 @@ jobs:
           id-field: id
           resource-name: tutorbot-supabase-staging
           placeholder: SUPABASE_HYPERDRIVE_ID_STAGING
+          working-directory: apps/bot-fleet
+      # Cold-start guard: if platform-gateway-staging does not exist yet, drop the
+      # GATEWAY binding for THIS deploy only (ephemeral) so the first chain can run.
+      - name: Ensure GATEWAY target exists (cold-start guard)
+        id: guard
+        uses: ./.github/actions/ensure-binding-target
+        with:
+          target-script: tutorbot-platform-gateway-staging
+          binding-name: GATEWAY
+          env-name: staging
           working-directory: apps/bot-fleet
       - name: Deploy bot-fleet (staging)
         working-directory: apps/bot-fleet
@@ -319,9 +334,56 @@ jobs:
       - name: Deploy gateway (staging)
         run: pnpm --filter "@tutorbot/platform-gateway-worker" exec wrangler deploy --env staging --containers-rollout=gradual
 
+  # 7) bot-fleet FINALIZE (cold-start only) ------------------------------------
+  # Runs ONLY when bf-deploy's cold-start guard stripped the GATEWAY binding
+  # (platform-gateway-staging did not exist yet). Now that pgw-deploy has created
+  # it, redeploy bot-fleet with the FULL committed config so the GATEWAY service
+  # binding is restored. On a bootstrapped env the guard is a no-op and this job
+  # is skipped -> zero extra deploys in steady state.
+  bf-finalize:
+    name: bf staging finalize
+    needs: [bf-deploy, pgw-deploy]
+    if: ${{ needs.bf-deploy.outputs.stripped == 'true' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build shared package
+        run: pnpm --filter "@tutorbot/shared" build
+      - name: Pin staging Hyperdrive id (resolve-only)
+        uses: ./.github/actions/pin-resource-id
+        with:
+          api-path: hyperdrive/configs
+          id-field: id
+          resource-name: tutorbot-supabase-staging
+          placeholder: SUPABASE_HYPERDRIVE_ID_STAGING
+          working-directory: apps/bot-fleet
+      # Fresh checkout => full config (GATEWAY binding present); it now resolves.
+      - name: Redeploy bot-fleet with GATEWAY binding (staging)
+        working-directory: apps/bot-fleet
+        run: pnpm exec wrangler deploy --env staging
+
 # COLD ENVIRONMENT NOTE ------------------------------------------------------
-# On a brand-new account the service-binding graph has a cycle (bf -> pgw -> fm
-# -> bf), so no strict order can satisfy every binding on the FIRST deploy. This
-# chain assumes a bootstrapped env (targets already exist). For a cold bootstrap,
-# run once with the cross-service bindings temporarily removed (or deploy stubs),
-# then re-run this pipeline.
+# The service-binding graph is cyclic (bf -> pgw -> fm -> bf) and same-account
+# Worker->Worker MUST use a binding (workers.dev HTTP is rejected, error 1042),
+# so no binding can be dropped permanently and no strict order satisfies every
+# binding on a cold FIRST deploy. This is handled automatically: bf-deploy's
+# cold-start guard (ensure-binding-target) ephemerally drops bot-fleet's GATEWAY
+# binding when platform-gateway-<env> does not exist yet, letting the chain
+# create all three Workers; bf-finalize then redeploys bot-fleet with the full
+# config once the gateway exists. No manual steps, no committed changes.
