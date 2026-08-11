@@ -216,7 +216,7 @@ placement, not a legal residency guarantee. (Container placement has no APAC reg
 the AU container falls back to Cloudflare-default placement.)
 
 Each region binds its **own** Secrets Store + Postgres (regional `store_id` +
-`DB_<REGION>_PRODUCTION_PASSWORD`), resolved by name at deploy time by CI. Regions never
+`TUTORBOT_DB_<REGION>_PRODUCTION_PASSWORD`), resolved by name at deploy time by CI. Regions never
 share state and there are **no cross-region service bindings**.
 
 ---

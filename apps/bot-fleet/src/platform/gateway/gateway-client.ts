@@ -76,9 +76,9 @@ export async function deliverReplyToGateway(
   if (!base) {
     return { status: "skip" };
   }
-  if (env.CF_ACCESS_CLIENT_ID && env.CF_ACCESS_CLIENT_SECRET) {
-    headers["CF-Access-Client-Id"] = env.CF_ACCESS_CLIENT_ID;
-    headers["CF-Access-Client-Secret"] = env.CF_ACCESS_CLIENT_SECRET;
+  if (env.GW_ACCESS_CLIENT_ID && env.GW_ACCESS_CLIENT_SECRET) {
+    headers["CF-Access-Client-Id"] = env.GW_ACCESS_CLIENT_ID;
+    headers["CF-Access-Client-Secret"] = env.GW_ACCESS_CLIENT_SECRET;
   }
   return send("url", () =>
     fetch(`${base}/outbound`, { method: "POST", headers, body }),

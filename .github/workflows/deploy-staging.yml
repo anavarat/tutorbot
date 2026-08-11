@@ -19,7 +19,8 @@ name: Deploy Staging
 # target already exists from a prior run). For a COLD environment see the note at
 # the bottom.
 #
-# SECRETS: only the *-deploy jobs need CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID,
+# SECRETS/VARS: only the *-deploy jobs need CLOUDFLARE_API_TOKEN (secret) +
+# CLOUDFLARE_ACCOUNT_ID (variable, not a credential),
 # read directly from the `staging` GitHub Environment. The *-check jobs need NO
 # secrets.
 #
@@ -95,7 +96,7 @@ jobs:
       name: staging
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -126,6 +127,24 @@ jobs:
       - name: Deploy bot-fleet (staging)
         working-directory: apps/bot-fleet
         run: pnpm exec wrangler deploy --env staging
+      # Seed the gateway Access service-token (fallback path) as a Worker secret.
+      # Source = the `staging` Environment secret PGW_ACCESS_* (pushed by the IaC
+      # handoff = the platform-gateway service token). bot-fleet reads it as
+      # GW_ACCESS_* when it calls the gateway over the public edge. Inert while the
+      # GATEWAY service binding is present; skipped if the secret is absent.
+      - name: Seed gateway Access token (staging)
+        working-directory: apps/bot-fleet
+        env:
+          GW_ACCESS_CLIENT_ID: ${{ secrets.PGW_ACCESS_CLIENT_ID }}
+          GW_ACCESS_CLIENT_SECRET: ${{ secrets.PGW_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -n "${GW_ACCESS_CLIENT_ID:-}" ] && [ -n "${GW_ACCESS_CLIENT_SECRET:-}" ]; then
+            printf '%s' "$GW_ACCESS_CLIENT_ID"     | pnpm exec wrangler secret put GW_ACCESS_CLIENT_ID     --env staging
+            printf '%s' "$GW_ACCESS_CLIENT_SECRET" | pnpm exec wrangler secret put GW_ACCESS_CLIENT_SECRET --env staging
+          else
+            echo "PGW_ACCESS_* not set in staging env; skipping gateway fallback secret (service binding is primary)."
+          fi
 
   # 3) fleet-manager CHECK -----------------------------------------------------
   fm-check:
@@ -172,7 +191,7 @@ jobs:
       name: staging
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -212,6 +231,21 @@ jobs:
       - name: Deploy fleet-manager (staging)
         working-directory: apps/fleet-manager
         run: pnpm exec wrangler deploy --env staging
+      # Same gateway service-token, seeded into fleet-manager as GW_ACCESS_*
+      # (its own fallback path when calling the gateway over the public edge).
+      - name: Seed gateway Access token (staging)
+        working-directory: apps/fleet-manager
+        env:
+          GW_ACCESS_CLIENT_ID: ${{ secrets.PGW_ACCESS_CLIENT_ID }}
+          GW_ACCESS_CLIENT_SECRET: ${{ secrets.PGW_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -n "${GW_ACCESS_CLIENT_ID:-}" ] && [ -n "${GW_ACCESS_CLIENT_SECRET:-}" ]; then
+            printf '%s' "$GW_ACCESS_CLIENT_ID"     | pnpm exec wrangler secret put GW_ACCESS_CLIENT_ID     --env staging
+            printf '%s' "$GW_ACCESS_CLIENT_SECRET" | pnpm exec wrangler secret put GW_ACCESS_CLIENT_SECRET --env staging
+          else
+            echo "PGW_ACCESS_* not set in staging env; skipping gateway fallback secret (service binding is primary)."
+          fi
 
   # 5) platform-gateway CHECK --------------------------------------------------
   pgw-check:
@@ -254,7 +288,7 @@ jobs:
       name: staging
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -279,7 +313,7 @@ jobs:
         with:
           api-path: secrets_store/stores
           id-field: id
-          resource-name: tutorbot-bots-staging
+          resource-name: default_secrets_store
           placeholder: STAGING_SECRETS_STORE_ID
           working-directory: apps/platform-gateway/worker
       - name: Deploy gateway (staging)

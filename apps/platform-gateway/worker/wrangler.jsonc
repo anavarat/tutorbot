@@ -103,7 +103,7 @@
   // first touch, so it lands in-region transitively. staging is single/AU;
   // production fans out to us/uk/au. Each region has its OWN region-suffixed
   // container + FLEET_MANAGER sibling + Secrets Store (PROD_<r>_SECRETS_STORE_ID)
-  // + regional secret DB_<R>_PRODUCTION_PASSWORD + per-region Supabase host.
+  // + regional secret TUTORBOT_DB_<R>_PRODUCTION_PASSWORD + per-region Supabase host.
   //   Region map:  us -> aws:us-east-1 | uk -> aws:eu-west-2 | au -> aws:ap-southeast-2
   // NOTE(container region): CF container placement supports only ENAM/WNAM/EEUR/WEUR
   //   (no APAC); we do NOT pin containers[].placement — it follows the Worker via
@@ -128,7 +128,7 @@
           // store_id is a PLACEHOLDER TOKEN; resolve/create the Secrets Store and
           // paste its id (`wrangler secrets-store list`).
           "store_id": "STAGING_SECRETS_STORE_ID",
-          "secret_name": "DB_STAGING_PASSWORD"
+          "secret_name": "TUTORBOT_DB_STAGING_PASSWORD"
         }
       ],
       "services": [{ "binding": "FLEET_MANAGER", "service": "tutorbot-fleet-manager-staging" }],
@@ -162,7 +162,7 @@
         {
           "binding": "DB_PASSWORD",
           "store_id": "PROD_us_SECRETS_STORE_ID",
-          "secret_name": "DB_US_PRODUCTION_PASSWORD"
+          "secret_name": "TUTORBOT_DB_US_PRODUCTION_PASSWORD"
         }
       ],
       "services": [{ "binding": "FLEET_MANAGER", "service": "tutorbot-fleet-manager-us-production" }],
@@ -196,7 +196,7 @@
         {
           "binding": "DB_PASSWORD",
           "store_id": "PROD_uk_SECRETS_STORE_ID",
-          "secret_name": "DB_UK_PRODUCTION_PASSWORD"
+          "secret_name": "TUTORBOT_DB_UK_PRODUCTION_PASSWORD"
         }
       ],
       "services": [{ "binding": "FLEET_MANAGER", "service": "tutorbot-fleet-manager-uk-production" }],
@@ -230,7 +230,7 @@
         {
           "binding": "DB_PASSWORD",
           "store_id": "PROD_au_SECRETS_STORE_ID",
-          "secret_name": "DB_AU_PRODUCTION_PASSWORD"
+          "secret_name": "TUTORBOT_DB_AU_PRODUCTION_PASSWORD"
         }
       ],
       "services": [{ "binding": "FLEET_MANAGER", "service": "tutorbot-fleet-manager-au-production" }],

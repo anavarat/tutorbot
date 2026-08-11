@@ -35,7 +35,7 @@ export interface BotFleetEnv {
    * PREFERRED delivery transport: internal service binding to the gateway Worker
    * (script "platform-gateway"). A Worker->Worker binding call reaches the gateway
    * directly, bypassing Cloudflare Access + the public edge; when present it is
-   * used INSTEAD of GATEWAY_BASE_URL/CF_ACCESS_* (which become an inert fallback).
+   * used INSTEAD of GATEWAY_BASE_URL/GW_ACCESS_* (which become an inert fallback).
    */
   GATEWAY?: Fetcher;
   /**
@@ -48,6 +48,6 @@ export interface BotFleetEnv {
    * Optional Cloudflare Access service-token creds (SECRETS, set via
    * `wrangler secret put`). Only needed if the gateway hostname is Access-gated.
    */
-  CF_ACCESS_CLIENT_ID?: string;
-  CF_ACCESS_CLIENT_SECRET?: string;
+  GW_ACCESS_CLIENT_ID?: string;
+  GW_ACCESS_CLIENT_SECRET?: string;
 }
