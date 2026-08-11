@@ -79,7 +79,10 @@
         "bindings": [{ "name": "BOT_FLEET_DO", "class_name": "BotFleetDO" }]
       },
       "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "SUPABASE_HYPERDRIVE_ID_STAGING" }],
-      "services": [{ "binding": "GATEWAY", "service": "tutorbot-platform-gateway-staging" }]
+      // BOOTSTRAP (temporary): GATEWAY edge dropped to break the cold-start
+      // cyclic service-binding graph (bf->pgw->fm->bf). Restore after the first
+      // full chain creates platform-gateway-staging. See COLD ENVIRONMENT NOTE.
+      "services": []
     },
     "us-production": {
       "placement": { "region": "aws:us-east-1" },
